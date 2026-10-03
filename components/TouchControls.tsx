@@ -20,6 +20,7 @@ import {
   actionMap, actionPhone, actionGraphics, actionNextCar, actionResetCar,
 } from "@/lib/actions";
 import { isMuted, unlockAudio } from "@/lib/audio";
+import { useCreditsStore } from "@/components/CreditsPanel";
 
 type HoldKey = Exclude<keyof KeyState, "left" | "right">;
 
@@ -245,6 +246,7 @@ function SettingsMenu({ onClose }: { onClose: () => void }) {
         />
         <span>{sens.toFixed(1)}x</span>
       </label>
+      {item("CREDITS", () => useCreditsStore.getState().setOpen(true))}
       <div className="tc-tip">Drag on the road to look around</div>
     </div>
   );

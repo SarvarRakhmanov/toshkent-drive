@@ -8,6 +8,7 @@ import { useLoadStore } from "@/lib/loadState";
 import { frameErrors } from "@/lib/safeFrame";
 import { physicsHealth } from "@/lib/physicsGuard";
 import { useHudStore } from "@/lib/hudStore";
+import { cameraLook } from "@/lib/cameraLook";
 
 if (typeof window !== "undefined") {
   (window as unknown as { __td: unknown }).__td = {
@@ -17,5 +18,7 @@ if (typeof window !== "undefined") {
     load: () => { const s = useLoadStore.getState(); return { phase: s.phase, progress: s.progress, stage: s.stage, readyAt: s.readyAt }; },
     health: () => ({ frameErrors: { ...frameErrors }, physics: { ...physicsHealth } }),
     active: () => useHudStore.getState().active,
+    // orbit the chase camera (screenshots of the car's front)
+    look: (yaw: number, pitch = 0) => { cameraLook.targetYaw = cameraLook.yaw = yaw; cameraLook.targetPitch = cameraLook.pitch = pitch; },
   };
 }

@@ -4,6 +4,7 @@ import { useHudStore, CAM_MODES, type CamMode } from "@/lib/hudStore";
 import { useAuthStore } from "@/lib/authStore";
 import { useGfxStore } from "@/lib/gfx";
 import { usePlayerCarStore, PLAYER_CARS } from "@/lib/playerCar";
+import { CreditsPanel, useCreditsStore } from "@/components/CreditsPanel";
 import { saveGame } from "@/lib/saveGame";
 import { Minimap } from "@/components/Minimap";
 import { BigMap } from "@/components/BigMap";
@@ -198,7 +199,7 @@ export function HUD() {
         <br />
         <b>R</b> reset car onto road
         <br />
-        <b>K</b> change car (Seltos/Lacetti/M3/K5)
+        <b>K</b> change car (Seltos/Lacetti/M3/K5/M3 Comp.)
         <br />
         <b>Q</b> graphics high / low
         <br />
@@ -223,11 +224,14 @@ export function HUD() {
         <b>P</b> phone
         <br />
         <b>H</b> hide this help
+        <br />
+        <button type="button" className="td-credits-link" onClick={() => useCreditsStore.getState().setOpen(true)}>CREDITS</button>
       </div>
       )}
       </>
       )}
 
+      <CreditsPanel />
       <div id="vig" />
       <div onClick={() => setMapOpen(true)}>
         <Minimap />

@@ -14,6 +14,19 @@ import type * as THREE from "three";
  *  the moment of a crash, which stalled weak GPUs for seconds. Temporarily
  *  reveal every hidden non-light object for the compile pass. Lights stay as
  *  they are so the light-count part of the program keys is unchanged. */
+/** Boot holds: a Suspense fallback rendering <BootHold/> keeps the loading
+ *  screen up (and the shader precompile waiting) until its content mounts,
+ *  even when the loader manager already reports idle (meshopt/texture decode
+ *  still running), so late-resolving assets are part of the compile pass. */
+let holds = 0;
+export function BootHold() {
+  useEffect(() => {
+    holds++;
+    return () => { holds--; };
+  }, []);
+  return null;
+}
+
 /** Belt and braces for scripts/optimize-models.mjs: any material that still
  *  has transmission would trigger three's extra transmission render pass (a
  *  second full set of shader programs + every opaque draw again). */
@@ -71,7 +84,7 @@ export function ReadyGate({ stages }: { stages: number }) {
       return;
     }
     const timedOut = performance.now() - startedAt.current > 45000; // never trap the player on the loader
-    if ((active || sinceStage.current < 4) && !timedOut) {
+    if ((active || holds > 0 || sinceStage.current < 4) && !timedOut) {
       st.set({ progress: Math.max(st.progress, 0.6 + 0.25 * (progress / 100)) });
       return;
     }

@@ -1,0 +1,48 @@
+"use client";
+
+import { create } from "zustand";
+
+// In-game credits (the full list lives in CREDITS.md). Opened from the desktop
+// help panel ("?") and from the touch "…" menu.
+export const useCreditsStore = create<{ open: boolean; setOpen: (o: boolean) => void }>((set) => ({
+  open: false,
+  setOpen: (open) => set({ open }),
+}));
+
+const REPO = "https://github.com/SarvarRakhmanov/toshkent-drive/blob/main/CREDITS.md";
+
+export function CreditsPanel() {
+  const open = useCreditsStore((s) => s.open);
+  const setOpen = useCreditsStore((s) => s.setOpen);
+  if (!open) return null;
+  return (
+    <div id="td-credits" role="dialog" aria-label="Credits" onPointerDown={(e) => e.stopPropagation()}>
+      <button type="button" className="close" onClick={() => setOpen(false)} aria-label="Close credits">✕</button>
+      <h2>CREDITS</h2>
+      <p>
+        <b>BMW M3 Competition</b> by{" "}
+        <a href="https://sketchfab.com/VTX_car" target="_blank" rel="noreferrer">VTX</a>{" "}
+        (<a href="https://sketchfab.com/3d-models/bmw-m3-competition-641603169bfa4285a297a59883c653de" target="_blank" rel="noreferrer">Sketchfab</a>),{" "}
+        <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noreferrer">CC BY-NC-SA 4.0</a>,
+        modified (decimated/compressed). The modified model is shared under the same license, so
+        Toshkent Drive is a free, non-commercial game.
+      </p>
+      <p>
+        <b>Lacetti</b> by uzb_rx7, <b>BMW M3 E30</b> by TinoD2, <b>Kia K5</b> by dannzjs
+        (Sketchfab, CC BY 4.0). Kia Seltos model supplied by the owner.
+      </p>
+      <p>
+        Traffic cars by DanielZhabotinsky and roh3d. Buildings by cn-entertainment, MrAeterna,
+        bral_unit, Lost_Gecko and Colin.Greenall (Sketchfab, CC BY 4.0). Sky HDRI and tree
+        textures from Poly Haven (CC0).
+      </p>
+      <p>
+        Engine template: Neon City Drive by ma67-ex (MIT). Built with three.js, React Three
+        Fiber, Rapier and Next.js.
+      </p>
+      <p>
+        Full list with links: <a href={REPO} target="_blank" rel="noreferrer">CREDITS.md</a>
+      </p>
+    </div>
+  );
+}

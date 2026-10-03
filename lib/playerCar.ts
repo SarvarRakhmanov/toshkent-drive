@@ -11,13 +11,19 @@ export interface PlayerCarDef {
   length: number;
   paint?: RegExp; // material-name pattern that takes the paint colour
   color?: string;
+  /** Uzbek licence plate (pre-baked by scripts/make-plates.py): texture url and
+   *  plate-centre heights above the ground (m); depth is found by raycasting
+   *  onto the bumper so the plate sits just off the body surface. */
+  plate?: { url: string; frontY: number; rearY: number };
 }
 
 export const PLAYER_CARS: PlayerCarDef[] = [
-  { id: "seltos", name: "KIA SELTOS", url: "/models/cars/seltos.glb", rotY: Math.PI / 2, length: 4.37, paint: /carpaint/i, color: "#b7c0b0" },
-  { id: "lacetti", name: "CHEVROLET LACETTI", url: "/models/cars/lacetti.glb", rotY: 0, length: 4.51 },
+  { id: "seltos", name: "KIA SELTOS", url: "/models/cars/seltos.glb", rotY: Math.PI / 2, length: 4.37, paint: /carpaint/i, color: "#b7c0b0", plate: { url: "/textures/plates/seltos.png", frontY: 0.57, rearY: 0.9 } },
+  { id: "lacetti", name: "CHEVROLET LACETTI", url: "/models/cars/lacetti.glb", rotY: 0, length: 4.51, plate: { url: "/textures/plates/lacetti.png", frontY: 0.4, rearY: 0.7 } },
   { id: "m3", name: "BMW M3 E30", url: "/models/cars/bmw-m3.glb", rotY: 0, length: 4.36, paint: /body|paint|carpaint/i, color: "#e8e6e0" },
   { id: "k5", name: "KIA K5", url: "/models/cars/k5.glb", rotY: 0, length: 4.7, paint: /body|paint|carpaint/i, color: "#1c2126" },
+  // "BMW M3 Competition" by VTX (Sketchfab), CC BY-NC-SA 4.0, decimated/compressed (see CREDITS.md)
+  { id: "m3c", name: "BMW M3 COMPETITION", url: "/models/cars/bmw-m3-competition.glb", rotY: Math.PI, length: 4.79 },
 ];
 
 const KEY = "td_player_car";

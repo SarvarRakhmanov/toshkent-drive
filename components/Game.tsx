@@ -43,10 +43,11 @@ import { DriftFX } from "@/components/DriftFX";
 import { Debris } from "@/components/Debris";
 import { WaypointTracker } from "@/components/WaypointTracker";
 import { HUD } from "@/components/HUD";
+import { PrewarmAssets } from "@/components/GlbCar";
 import { useGfxStore, profileFor } from "@/lib/gfx";
 import { LightPool } from "@/components/LightPool";
 import { Deferred } from "@/components/Deferred";
-import { ReadyGate } from "@/components/ReadyGate";
+import { ReadyGate, BootHold } from "@/components/ReadyGate";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { Cull, FogFarSync, LowEnvironment, AutoQuality, DprSync, PhysicsProbe } from "@/components/SceneTools";
 import { asset } from "@/lib/asset";
@@ -370,6 +371,9 @@ export default function Game() {
             <NitroFX vehicleKey="tank" halfLen={4.76} />
             <DriftFX />
             <Debris />
+            {/* hidden: lets the boot precompile cover the K-garage BMW M3
+                Competition and the licence-plate material */}
+            <Suspense fallback={<BootHold />}><PrewarmAssets /></Suspense>
             <TankCombat />
             <WaypointTracker />
           </Deferred>

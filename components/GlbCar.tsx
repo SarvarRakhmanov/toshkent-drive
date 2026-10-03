@@ -5,8 +5,9 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { asset } from "@/lib/asset";
 import { RIDE_HEIGHT } from "@/components/SupercarBody";
-import { PLAYER_CARS, usePlayerCarStore } from "@/lib/playerCar";
+import { PLAYER_CARS, usePlayerCarStore, type PlayerCarDef } from "@/lib/playerCar";
 import { noTransmission } from "@/components/ReadyGate";
+import { coatScene } from "@/lib/weatherCoat";
 
 // Toshkent Drive: real GLB car bodies (the player's own cars + CC-BY traffic
 // cars from the Grok Build project) dropped into this engine's car rigs.
@@ -90,7 +91,93 @@ function prepare(scene: THREE.Object3D, rotY: number, length: number, paint: Reg
     mesh.material = tinted.length === 1 ? tinted[0] : tinted;
   }
   wrap.position.y = -RIDE_HEIGHT;
+  // weather-coat shader patch right away: otherwise the car first compiles an
+  // uncoated program and recompiles ~2 s later when Weather's scan coats it
+  coatScene(wrap);
   return wrap;
+}
+
+// ── licence plates ───────────────────────────────────────────────────────────
+// One shared 0.52 x 0.11 m plane + one unlit material per plate texture.
+// Created synchronously (the texture fills in when its 15 KB PNG arrives), so
+// the shader program is identical before/after load and compiles at boot.
+const PLATE_GEO = new THREE.PlaneGeometry(0.52, 0.11);
+const plateMats = new Map<string, THREE.MeshBasicMaterial>();
+function plateMaterial(url: string) {
+  let m = plateMats.get(url);
+  if (!m) {
+    const tex = new THREE.TextureLoader().load(asset(url));
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    // polygonOffset + a 1 cm stand-off from the bumper: no z-fighting at any distance
+    m = new THREE.MeshBasicMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    m.name = "td-plate";
+    plateMats.set(url, m);
+  }
+  return m;
+}
+
+/** Front + rear plates on a prepared car (wrap space: ground y=0, nose +z).
+ *  The model's own placeholder plates ("nameplate" material) are hidden; each
+ *  plate is raycast onto the body and turned to the surface normal there (so
+ *  it follows a slanted tailgate) with a 1.2 cm stand-off: no z-fighting. */
+function addPlates(wrap: THREE.Object3D, plate: NonNullable<PlayerCarDef["plate"]>) {
+  wrap.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(wrap);
+  const meshes: THREE.Object3D[] = [];
+  wrap.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    const mat = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.Material;
+    if (/nameplate|licen[cs]e|number ?plate/i.test(mat.name || "")) { m.visible = false; return; }
+    if (mat.transparent && mat.opacity < 0.9) return; // skip glass/lenses
+    meshes.push(m);
+  });
+  const ray = new THREE.Raycaster();
+  const mat = plateMaterial(plate.url);
+  const n = new THREE.Vector3();
+  for (const side of [1, -1] as const) {
+    const y = side > 0 ? plate.frontY : plate.rearY;
+    const edge = side > 0 ? box.max.z : box.min.z;
+    ray.far = 2.5;
+    // centre ray for the surface normal; edge rays so a body that bulges out
+    // at the sides never swallows part of the plate (outermost hit wins)
+    let hit: THREE.Intersection | undefined;
+    let outer = -Infinity;
+    for (const x of [0, -0.25, 0.25, 0]) {
+      ray.set(new THREE.Vector3(x, y, edge + side), new THREE.Vector3(0, 0, -side));
+      const h = ray.intersectObjects(meshes, false)[0];
+      if (!h) continue;
+      if (x === 0 && !hit) hit = h;
+      outer = Math.max(outer, h.point.z * side);
+    }
+    n.set(0, 0, side);
+    if (hit?.face) {
+      n.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
+      n.x = 0; // keep the plate square to the car; only follow the pitch
+      if (n.lengthSq() < 1e-6 || n.z * side < 0.5) n.set(0, 0, side);
+      n.normalize();
+    }
+    const p = new THREE.Vector3(0, y, Number.isFinite(outer) ? outer * side : edge);
+    // tilted plate: its top/bottom edges reach 5.5 cm * tan(tilt) further in
+    const tilt = Math.sqrt(Math.max(0, 1 - n.z * n.z)) / Math.max(0.5, Math.abs(n.z));
+    p.addScaledVector(n, 0.012 + 0.055 * tilt);
+    const m = new THREE.Mesh(PLATE_GEO, mat);
+    m.name = "td-plate";
+    m.position.copy(p);
+    m.lookAt(p.clone().add(n)); // plane's front (+z) faces out along the normal
+    wrap.add(m);
+  }
+}
+
+function preparePlayer(def: PlayerCarDef, scene: THREE.Object3D) {
+  const obj = prepare(scene, def.rotY, def.length, def.paint, def.color, false, true);
+  if (def.plate) {
+    obj.position.y = 0; // addPlates works in ground-relative wrap space
+    addPlates(obj, def.plate);
+    obj.position.y = -RIDE_HEIGHT;
+  }
+  return obj;
 }
 
 /** The player's own car (Kia Seltos by default, K cycles the garage). */
@@ -98,8 +185,24 @@ export function PlayerGlbCar() {
   const index = usePlayerCarStore((s) => s.index);
   const def = PLAYER_CARS[index];
   const gltf = useGLTF(asset(def.url));
-  const obj = useMemo(() => prepare(gltf.scene, def.rotY, def.length, def.paint, def.color, false, true), [gltf, def]);
+  const obj = useMemo(() => preparePlayer(def, gltf.scene), [gltf, def]);
   return <primitive object={obj} />;
+}
+
+/** Hidden copies of assets that may first appear mid-game (the BMW M3
+ *  Competition from the K garage, the plate material) so the boot shader
+ *  precompile in ReadyGate covers them; never drawn (visible=false). */
+export function PrewarmAssets() {
+  const def = PLAYER_CARS.find((c) => c.id === "m3c")!;
+  const gltf = useGLTF(asset(def.url));
+  const obj = useMemo(() => {
+    const o = preparePlayer(def, gltf.scene);
+    const plate = new THREE.Mesh(PLATE_GEO, plateMaterial(PLAYER_CARS.find((c) => c.plate)!.plate!.url));
+    o.add(plate);
+    o.visible = false;
+    return o;
+  }, [gltf, def]);
+  return <primitive object={obj} position={[0, -400, 0]} />;
 }
 
 // CC-BY low-poly traffic cars (see CREDITS.md)

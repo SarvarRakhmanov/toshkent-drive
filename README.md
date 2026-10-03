@@ -1,7 +1,7 @@
 # Toshkent Drive — open world
 
 Browser open-world driving game themed on Tashkent. Drive your own Kia Seltos (or the
-Lacetti, BMW M3 E30 and Kia K5) through a chunk-streamed city with traffic, pedestrians,
+Lacetti, BMW M3 E30, Kia K5 and BMW M3 Competition) through a chunk-streamed city with traffic, pedestrians,
 day/night cycle, weather, minimap and soft shadows. Static site — no server, no login.
 
 Built on the MIT-licensed **Neon City Drive** engine by ma67-ex
@@ -44,3 +44,13 @@ simulated keys and saves screenshots to `shots/`.
   - `scripts/smoke.cjs`: desktop drive
   - `scripts/perf-profile.cjs`: draw calls, triangles, load time, bytes and heap
   - `scripts/crash-test.cjs`: high-speed crashes into NPC and police cars; the render loop must keep running
+
+## License note: non-commercial project
+
+The **BMW M3 Competition** player car (`public/models/cars/bmw-m3-competition.glb`) is
+"BMW M3 Competition" by [VTX](https://sketchfab.com/VTX_car)
+([Sketchfab](https://sketchfab.com/3d-models/bmw-m3-competition-641603169bfa4285a297a59883c653de)),
+licensed [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) and modified
+(decimated/compressed). The modified model stays under CC BY-NC-SA 4.0. Because of this
+asset, **Toshkent Drive is non-commercial**: it is free, with no ads and no paid features.
+Remove that model before any commercial use. See [CREDITS.md](CREDITS.md) for all assets.

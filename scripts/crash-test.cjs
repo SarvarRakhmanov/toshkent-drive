@@ -14,7 +14,7 @@ const log = (...a) => console.log(`[${TAG}]`, ...a);
 (async () => {
   const browser = await pw.chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--disable-dev-shm-usage", "--js-flags=--max-old-space-size=2048"] });
   const page = await browser.newPage({ viewport: { width: Number(process.env.W || 800), height: Number(process.env.H || 450) } });
-  await page.addInitScript((q) => { localStorage.setItem("td_gfx_quality", q); localStorage.removeItem("td_save"); }, process.env.QUALITY || "low");
+  await page.addInitScript(([q, car]) => { localStorage.setItem("td_gfx_quality", q); localStorage.removeItem("td_save"); if (car) localStorage.setItem("td_player_car", car); }, [process.env.QUALITY || "low", process.env.CAR || ""]);
   page.setDefaultTimeout(300000);
   const errors = [];
   const warns = [];

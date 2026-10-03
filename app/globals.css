@@ -284,3 +284,22 @@ html.td-touch #vig { background: radial-gradient(ellipse at center, transparent 
 .td-loading-bar { width: min(70vw, 360px); height: 6px; border-radius: 3px; background: #1b2236; overflow: hidden; }
 .td-loading-bar > div { height: 100%; width: 100%; background: linear-gradient(90deg, #2fb8ff, #ffd76a); transform-origin: left; transition: transform 0.25s ease; }
 .td-loading-label { font-size: 13px; opacity: 0.75; }
+
+/* in-game credits */
+#td-credits {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(92vw, 520px); max-height: 82vh; overflow-y: auto; z-index: 60;
+  background: rgba(12, 14, 22, 0.94); color: #e9eaf0; border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 14px; padding: 18px 20px; font: 13px/1.5 system-ui, sans-serif; pointer-events: auto;
+}
+#td-credits h2 { margin: 0 0 8px; font-size: 15px; letter-spacing: 0.12em; color: #ffd166; }
+#td-credits p { margin: 0 0 10px; }
+#td-credits a { color: #8ecbff; }
+#td-credits .close {
+  position: absolute; top: 8px; right: 10px; background: none; border: 0; color: #fff;
+  font-size: 18px; cursor: pointer; padding: 4px 8px;
+}
+#controls .td-credits-link {
+  margin-top: 6px; background: none; border: 1px solid rgba(255,255,255,0.3); color: #ffd166;
+  border-radius: 6px; padding: 2px 8px; cursor: pointer; font: inherit; pointer-events: auto;
+}
