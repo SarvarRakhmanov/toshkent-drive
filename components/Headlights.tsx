@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import * as THREE from "three";
 import { useHudStore } from "@/lib/hudStore";
 import { skyState } from "@/lib/skyState";

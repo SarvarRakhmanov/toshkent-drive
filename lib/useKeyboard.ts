@@ -43,6 +43,8 @@ const keyboard: KeyState = blank();
 /** Written by components/TouchControls.tsx. */
 export const touchInput: KeyState & { steerAxis: number } = { ...blank(), steerAxis: 0 };
 
+export const RELEASE_EVENT = "td-release-input";
+
 export function clearTouchInput() {
   Object.assign(touchInput, blank(), { steerAxis: 0 });
 }
@@ -95,8 +97,13 @@ function install() {
   const releaseAll = () => {
     Object.assign(keyboard, blank());
     clearTouchInput();
+    // touch widgets track which finger holds them; a finger lifted while the
+    // app was in the background never sends pointerup, so tell them to forget
+    // (otherwise GAS stayed held / the steering pad ignored every new touch)
+    window.dispatchEvent(new Event(RELEASE_EVENT));
   };
   window.addEventListener("blur", releaseAll);
+  window.addEventListener("pagehide", releaseAll);
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) releaseAll();
   });

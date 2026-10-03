@@ -2,7 +2,8 @@
 
 import { useRef, useEffect, useMemo, useState, Suspense } from "react";
 import { PlayerGlbCar } from "@/components/GlbCar";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useThree } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import { RigidBody, CuboidCollider, useRapier, type RapierRigidBody, type RapierCollider } from "@react-three/rapier";
 import { VEHICLE_BODY_GROUPS, VEHICLE_SWEEP_GROUPS } from "@/lib/collisionGroups";
 import * as THREE from "three";
@@ -24,6 +25,7 @@ import { SHORE_X, DROWN_RESPAWN, clampFromWater, isOnBridgeOrBase, groundYAt } f
 import { SupercarBody, styleFor, RIDE_HEIGHT, type CarStyle, type Detail } from "@/components/SupercarBody";
 import { CarInterior } from "@/components/CarInterior";
 import { QueryFilterFlags, type KinematicCharacterController } from "@dimforge/rapier3d-compat";
+import { tmpQuat, AXIS_Y } from "@/lib/scratch";
 
 const GRAVITY_PULL = -12; // m/s^2 fed into the character controller so it stays snapped to the ground
 const NITRO_MAX = 10; // seconds of fuel — same numbers as the original's NITRO_MAX/NITRO_BOOST
@@ -47,6 +49,7 @@ export function Car() {
   // persistent car state across frames (heading/speed/vLat/steerAng) — mirrors the
   // original game's per-vehicle object, kept in a ref so updating it never re-renders
   const car = useRef<CarState>({ h: save?.h ?? 0, speed: 0, vLat: 0, steerAng: 0 });
+  const restFrames = useRef(0);
   const fallSpeed = useRef(0);
   const drownTime = useRef(0);
   const crashCooldown = useRef(0);
@@ -144,6 +147,14 @@ export function Car() {
       return;
     }
 
+    // NaN guard: one bad frame must never propagate into the body/camera
+    const cs = car.current;
+    if (!Number.isFinite(cs.h) || !Number.isFinite(cs.speed) || !Number.isFinite(cs.vLat) || !Number.isFinite(cs.steerAng)) {
+      cs.h = Number.isFinite(cs.h) ? cs.h : 0;
+      cs.speed = 0; cs.vLat = 0; cs.steerAng = 0;
+    }
+    if (!Number.isFinite(fallSpeed.current)) fallSpeed.current = 0;
+
     const k = keys.current;
     // analog touch steering (components/TouchControls.tsx) when the thumb is on
     // the pad, otherwise the plain digital left/right keys
@@ -177,7 +188,10 @@ export function Car() {
 
     // ground snap: small constant fall fed into the character controller, which
     // clamps it back to zero the instant it detects the floor (see enableSnapToGround)
-    fallSpeed.current += GRAVITY_PULL * d;
+    // parked & settled: skip the character-controller sweep entirely (every
+    // parked vehicle used to shape-cast against the world every frame)
+    if (!isActive && Math.abs(car.current.speed) < 0.02 && Math.abs(car.current.vLat) < 0.02 && restFrames.current > 30) return;
+    fallSpeed.current = Math.max(-60, fallSpeed.current + GRAVITY_PULL * d);
     // EXCLUDE_DYNAMIC: props (components/Props.tsx) are the only dynamic bodies
     // in the game — skipping them from the sweep means the car's trajectory
     // never slides/stops on a cone, it just plows through while the solver
@@ -195,6 +209,7 @@ export function Car() {
     controller.computeColliderMovement(collider, { x: dx, y: fallSpeed.current * d, z: dz }, QueryFilterFlags.EXCLUDE_DYNAMIC, VEHICLE_SWEEP_GROUPS);
     const grounded = controller.computedGrounded();
     if (grounded) fallSpeed.current = 0;
+    restFrames.current = !isActive && grounded && Math.abs(car.current.speed) < 0.02 ? restFrames.current + 1 : 0;
     const movement = controller.computedMovement();
     // #36 fix — the actual measured cause of the reported high-speed camera
     // judder: real repro data (sustained nitro runs, ~1000+ sampled frames,
@@ -219,6 +234,18 @@ export function Car() {
     // it here fixes the visible pop at its source instead of trying to
     // paper over it in the chase-cam lerp.
     if (movement.y > 0.06) movement.y = 0.06;
+    const preHitSpeed = Math.abs(car.current.speed);
+    // hard hit: the sweep ate most of the move (wall, building, traffic car) —
+    // bleed the speed off instead of ramming the obstacle at full speed every
+    // frame (which kept two kinematic bodies pressed into each other)
+    {
+      const want = Math.hypot(dx, dz);
+      const got = Math.hypot(movement.x, movement.z);
+      if (want > 0.02 && got < want * 0.5) {
+        car.current.speed *= Math.max(0.15, got / want);
+        car.current.vLat *= 0.5;
+      }
+    }
 
     const t = body.translation();
     const nextPos = { x: t.x + movement.x, y: t.y + movement.y, z: t.z + movement.z };
@@ -271,7 +298,7 @@ export function Car() {
     body.setNextKinematicTranslation(nextPos);
 
     if (isActive) {
-      checkCrashDebris(crashCooldown, d, { x: dx, z: dz }, { x: movement.x, z: movement.z }, Math.abs(car.current.speed), nextPos, car.current.h);
+      checkCrashDebris(crashCooldown, d, { x: dx, z: dz }, { x: movement.x, z: movement.z }, preHitSpeed, nextPos, car.current.h);
       // Pedestrians.tsx set this the instant it ragdolled someone under THIS
       // car this frame — only the active vehicle can have caused it, since
       // the hit-test runs against worldState (the active vehicle's own
@@ -281,7 +308,7 @@ export function Car() {
       if (hitSlow !== null) car.current.speed *= hitSlow;
     }
 
-    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), car.current.h);
+    const q = tmpQuat().setFromAxisAngle(AXIS_Y, car.current.h);
     body.setNextKinematicRotation(q);
 
     vehicleState.car.x = nextPos.x;

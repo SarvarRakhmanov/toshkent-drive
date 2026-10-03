@@ -20,7 +20,7 @@ const Game = dynamic(() => import("@/components/Game"), {
         fontFamily: "monospace",
       }}
     >
-      Loading Toshkent Drive…
+      <span style={{ color: "#ffd76a", letterSpacing: "0.12em", fontWeight: 700, fontSize: "clamp(22px, 6vw, 40px)" }}>TOSHKENT DRIVE</span>
     </div>
   ),
 });

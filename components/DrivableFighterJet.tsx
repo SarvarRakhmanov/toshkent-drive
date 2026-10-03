@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useThree } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import { RigidBody, type RapierRigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import { useKeyboard } from "@/lib/useKeyboard";
@@ -16,6 +17,7 @@ import { roofHeightAt } from "@/lib/buildings";
 import { groundYAt } from "@/lib/marina";
 import { FighterJetMesh } from "@/components/FighterJet";
 import { JET_SCALE } from "@/lib/militaryBase";
+import { tmpQuat, AXIS_X, AXIS_Y, AXIS_Z } from "@/lib/scratch";
 
 // FORT NEON's apron fighters, made real. They used to be pure decoration —
 // components/MilitaryBase.tsx rendered three FighterJetMesh at JET_SCALE and
@@ -91,10 +93,10 @@ export function DrivableFighterJet({ id }: { id: FighterJetId }) {
     pos.current.y = y;
 
     body.setNextKinematicTranslation({ x: pos.current.x, y: pos.current.y, z: pos.current.z });
-    const q = new THREE.Quaternion()
-      .setFromAxisAngle(new THREE.Vector3(0, 1, 0), fs.current.h)
-      .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), fs.current.pitch))
-      .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), fs.current.roll));
+    const q = tmpQuat()
+      .setFromAxisAngle(AXIS_Y, fs.current.h)
+      .multiply(tmpQuat().setFromAxisAngle(AXIS_X, fs.current.pitch))
+      .multiply(tmpQuat().setFromAxisAngle(AXIS_Z, fs.current.roll));
     body.setNextKinematicRotation(q);
 
     vehicleState[id].x = pos.current.x;

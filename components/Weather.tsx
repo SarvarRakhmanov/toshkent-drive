@@ -1,7 +1,9 @@
 "use client";
 
-import { useRef } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useRef, useState } from "react";
+import { currentProfile } from "@/lib/gfx";
+import { useThree } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import * as THREE from "three";
 import { useHudStore } from "@/lib/hudStore";
 import { worldState } from "@/lib/worldState";
@@ -120,6 +122,8 @@ const SUN_TEX = (() => {
   return new THREE.CanvasTexture(c);
 })();
 
+const SUN_WARM = new THREE.Color(0xfff2d0);
+
 export function Weather() {
   const { scene, gl } = useThree();
   const pointsRef = useRef<THREE.Points>(null);
@@ -131,6 +135,10 @@ export function Weather() {
   // after mount (this is a chunk-streamed open world) still get coated
   const coatScanRef = useRef(0);
   const sunGroupRef = useRef<THREE.Group>(null);
+  const sunLightRef = useRef<THREE.DirectionalLight | null>(null);
+  const [fogScaleInit] = useState(() => currentProfile().fogScale);
+  const fogScale = useRef(fogScaleInit);
+  const envBase = useRef(currentProfile().hdrEnv ? 0.45 : 0.3);
   const sunCoreRef = useRef<THREE.Sprite>(null);
   const sunHaloRef = useRef<THREE.Sprite>(null);
 
@@ -168,9 +176,10 @@ export function Weather() {
     const tgtNear = isFog ? 18 : isSnow ? 40 : isRain ? 55 : isOver ? 95 : isSunny ? 140 : 110;
     const tgtFar = isFog ? 95 : isSnow ? 150 : isRain ? 210 : isOver ? 320 : isSunny ? 480 : 430;
     const fog = scene.fog as THREE.Fog;
+    const fs = fogScale.current; // LOW tier: shorter fog → shorter camera far plane (FogFarSync)
     // eslint-disable-next-line react-hooks/immutability -- see note above useFrame
-    fog.near = THREE.MathUtils.lerp(fog.near, tgtNear, Math.min(1, dt * 0.5));
-    fog.far = THREE.MathUtils.lerp(fog.far, tgtFar, Math.min(1, dt * 0.5));
+    fog.near = THREE.MathUtils.lerp(fog.near, tgtNear * fs, Math.min(1, dt * 0.5));
+    fog.far = THREE.MathUtils.lerp(fog.far, tgtFar * fs, Math.min(1, dt * 0.5));
 
     const greyK = isFog ? 0.55 : isSnow ? 0.45 : isRain ? 0.4 : isOver ? 0.3 : 0;
     if (greyK > 0) {
@@ -195,15 +204,15 @@ export function Weather() {
       // light sibling by castShadow — getObjectByProperty can only match one
       // property, so this needs a real traversal): brighter and warmer than
       // a plain clear day
-      let sun: THREE.DirectionalLight | undefined;
-      scene.traverse((obj) => {
-        if (!sun && (obj as THREE.DirectionalLight).isDirectionalLight && (obj as THREE.DirectionalLight).castShadow) {
-          sun = obj as THREE.DirectionalLight;
-        }
-      });
+      // (cached: this used to traverse the whole ~6000-object scene every frame)
+      let sun = sunLightRef.current;
+      if (!sun || !sun.parent) {
+        sun = (scene.getObjectByName("td-sun") as THREE.DirectionalLight | undefined) ?? null;
+        sunLightRef.current = sun;
+      }
       if (sun) {
         sun.intensity *= 1.35;
-        sun.color.lerp(new THREE.Color(0xfff2d0), 0.4);
+        sun.color.lerp(SUN_WARM, 0.4);
       }
     }
 
@@ -281,7 +290,9 @@ export function Weather() {
       // eslint-disable-next-line react-hooks/immutability -- see note above useFrame
       scene.environment = getSunnyEnvMap(gl);
     }
-    if (scene.environment) scene.environmentIntensity = sunnyAmt;
+    // a little image light at all times (car paint/glass looked flat outside
+    // sunny weather), full strength when sunny
+    if (scene.environment) scene.environmentIntensity = Math.max(envBase.current, sunnyAmt);
 
     // the visible sun disc itself — parented to nothing, repositioned off
     // the player each frame (same "follow px/pz, fixed sky offset" trick the

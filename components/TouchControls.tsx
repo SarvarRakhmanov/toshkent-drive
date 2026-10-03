@@ -11,7 +11,7 @@
 // non-passive touchstart stops iOS Safari from scrolling, zooming, selecting
 // text or opening the long-press callout; CSS adds touch-action:none.
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { touchInput, clearTouchInput, type KeyState } from "@/lib/useKeyboard";
+import { touchInput, clearTouchInput, RELEASE_EVENT, type KeyState } from "@/lib/useKeyboard";
 import { useTouchStore } from "@/lib/touch";
 import { useHudStore, CAM_MODES } from "@/lib/hudStore";
 import { useGfxStore } from "@/lib/gfx";
@@ -27,12 +27,14 @@ type HoldKey = Exclude<keyof KeyState, "left" | "right">;
 function HoldButton({ k, className, children }: { k: HoldKey; className: string; children: ReactNode }) {
   const ids = useRef(new Set<number>());
   const [on, setOn] = useState(false);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    const reset = () => { ids.current.clear(); touchInput[k] = false; setOn(false); };
+    window.addEventListener(RELEASE_EVENT, reset);
+    return () => {
+      window.removeEventListener(RELEASE_EVENT, reset);
       touchInput[k] = false;
-    },
-    [k],
-  );
+    };
+  }, [k]);
   const down = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     try {
@@ -134,7 +136,14 @@ function SteerPad() {
     touchInput.right = false;
     setDir("");
   };
-  useEffect(() => release, []);
+  useEffect(() => {
+    window.addEventListener(RELEASE_EVENT, release);
+    return () => {
+      window.removeEventListener(RELEASE_EVENT, release);
+      release();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div
       ref={ref}

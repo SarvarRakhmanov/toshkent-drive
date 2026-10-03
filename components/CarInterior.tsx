@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import * as THREE from "three";
 import { tex } from "@/lib/airportTextures";
 import { DEFAULT_HANDLING, type CarState } from "@/lib/carPhysics";

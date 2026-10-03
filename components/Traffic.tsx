@@ -2,8 +2,9 @@
 
 import { Suspense } from "react";
 
-import { useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useRef, useState } from "react";
+import { currentProfile } from "@/lib/gfx";
+import { useFrame } from "@/lib/safeFrame";
 import { RigidBody, CuboidCollider, type RapierRigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import { CarMesh } from "@/components/Car";
@@ -48,6 +49,8 @@ interface Lane {
   // slower arcade "traffic" read, same reasoning as the police lanes topping
   // out higher because they're meant to feel urgent.
   kind?: CommercialKind;
+  // optional "busier streets" lane — skipped on phones on LOW (see Traffic())
+  extra?: boolean;
 }
 
 // Lane cross-axis values must land on the real road grid. City.tsx bakes
@@ -85,11 +88,11 @@ const LANES: Lane[] = [
 
   // more NPC traffic — a couple more streets, plus a 2nd car on two of the
   // busiest existing ones (same lane spec, different seed stagger)
-  { axis: "z", lane: 150, min: -85, max: 85, speed: 8, color: "#b33a3a", kind: "truck" },
-  { axis: "x", lane: -150, min: AIRPORT_MIN, max: 85, speed: 9, color: "#4a6a8a", kind: "jeep" },
-  { axis: "z", lane: -150, min: -85, max: 85, speed: 8, color: "#8a7a3a", kind: "bus" },
-  { axis: "x", lane: 50, min: AIRPORT_MIN, max: 85, speed: 9, color: "#5a5a5a", kind: "truck" },
-  { axis: "z", lane: -50, min: -85, max: 85, speed: 9, color: "#3a5a5a", kind: "jeep" },
+  { axis: "z", lane: 150, min: -85, max: 85, speed: 8, color: "#b33a3a", kind: "truck", extra: true },
+  { axis: "x", lane: -150, min: AIRPORT_MIN, max: 85, speed: 9, color: "#4a6a8a", kind: "jeep", extra: true },
+  { axis: "z", lane: -150, min: -85, max: 85, speed: 8, color: "#8a7a3a", kind: "bus", extra: true },
+  { axis: "x", lane: 50, min: AIRPORT_MIN, max: 85, speed: 9, color: "#5a5a5a", kind: "truck", extra: true },
+  { axis: "z", lane: -50, min: -85, max: 85, speed: 9, color: "#3a5a5a", kind: "jeep", extra: true },
 
   // more patrol cars, out near spawn rather than only around the station,
   // so you actually run into one without driving out to POLICE HARBOR
@@ -169,14 +172,29 @@ export const trafficPositions: TrafficSlot[] = LANES.map((l, i) => ({
 export const RESPAWN_DELAY = 14;
 
 export function Traffic() {
+  // phones on LOW run only the core lanes; a skipped lane's slot is parked as
+  // "stolen" forever so the minimap/steal/hint/tank code (which all iterate
+  // trafficPositions) simply ignore it
+  const [extra] = useState(() => currentProfile().trafficExtra);
   return (
     <>
-      {LANES.map((lane, i) => (
-        <TrafficCar key={i} lane={lane} seed={i} index={i} />
-      ))}
+      {LANES.map((lane, i) => {
+        if (lane.extra && !extra) {
+          trafficPositions[i].stolen = true;
+          trafficPositions[i].respawnIn = Infinity;
+          return null;
+        }
+        return <TrafficCar key={i} lane={lane} seed={i} index={i} />;
+      })}
     </>
   );
 }
+
+// scratch objects: the per-car kinematic rotation used to allocate a new
+// Quaternion + Vector3 per car per frame (~45 short-lived objects/frame → GC)
+const _q = new THREE.Quaternion();
+const _up = new THREE.Vector3(0, 1, 0);
+const _kin = { x: 0, y: 0, z: 0 };
 
 const RECRUIT_RADIUS2 = 70 * 70; // matches the original's d2<70*70 land-convoy recruit check
 
@@ -258,6 +276,7 @@ function TrafficCar({ lane, seed, index }: { lane: Lane; seed: number; index: nu
   const lightRefs = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
   const meshRef = useRef<THREE.Group>(null);
   const wasBlocked = useRef(false); // rising-edge latch for the debris burst below
+  const [drawDist2] = useState(() => currentProfile().npcDrawDist ** 2);
 
   useFrame((state, dt) => {
     const body = bodyRef.current;
@@ -281,7 +300,13 @@ function TrafficCar({ lane, seed, index }: { lane: Lane; seed: number; index: nu
       }
       return;
     }
-    if (meshRef.current) meshRef.current.visible = true;
+    // draw-distance cull: lane logic keeps running (minimap/obstacles need
+    // it), but a car beyond the fogged draw distance isn't drawn
+    if (meshRef.current) {
+      const ddx = slot.x - state.camera.position.x;
+      const ddz = slot.z - state.camera.position.z;
+      meshRef.current.visible = ddx * ddx + ddz * ddz < drawDist2;
+    }
 
     // background lane math always advances, even while convoying, so dropping
     // out of the convoy resumes patrol from a live position instead of
@@ -365,12 +390,12 @@ function TrafficCar({ lane, seed, index }: { lane: Lane; seed: number; index: nu
         const step = Math.min(dd, 16 * d); // 16 m/s convoy chase speed
         const nx = cx + (ddx / dd) * step;
         const nz = cz + (ddz / dd) * step;
-        convoyPos.current = { x: nx, z: nz };
+        if (convoyPos.current) { convoyPos.current.x = nx; convoyPos.current.z = nz; } else convoyPos.current = { x: nx, z: nz };
         x = nx;
         z = nz;
         heading = dd > 0.5 ? Math.atan2(ddx, ddz) : worldState.heading;
       } else {
-        convoyPos.current = { x: laneX, z: laneZ };
+        if (convoyPos.current) { convoyPos.current.x = laneX; convoyPos.current.z = laneZ; } else convoyPos.current = { x: laneX, z: laneZ };
       }
 
       const flashRed = Math.floor(state.clock.elapsedTime * 5) % 2 === 0;
@@ -387,8 +412,9 @@ function TrafficCar({ lane, seed, index }: { lane: Lane; seed: number; index: nu
     // groundYAt: 0 everywhere except FORT NEON's patrol lanes (lib/
     // militaryBase.ts's platform sits ~9 units up, not sea level) — same fix
     // Car.tsx/Bike.tsx/etc. needed for the same reason.
-    body.setNextKinematicTranslation({ x, y: groundYAt(x, z) + RIDE_HEIGHT, z });
-    body.setNextKinematicRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), heading));
+    _kin.x = x; _kin.y = groundYAt(x, z) + RIDE_HEIGHT; _kin.z = z;
+    body.setNextKinematicTranslation(_kin);
+    body.setNextKinematicRotation(_q.setFromAxisAngle(_up, heading));
     slot.x = x;
     slot.z = z;
     slot.h = heading; // lib/steal.ts hands this straight to the vehicle you take over

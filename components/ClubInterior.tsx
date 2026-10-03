@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import { RigidBody, CuboidCollider } from "@react-three/rapier";
 import { Billboard, Text } from "@react-three/drei";
 import * as THREE from "three";

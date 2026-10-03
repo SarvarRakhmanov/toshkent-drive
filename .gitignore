@@ -52,3 +52,6 @@ login page/
 # local
 /shots-tmp/
 *.log
+
+# original (un-optimized) GLB/texture sources for scripts/optimize-models.mjs (~27 MB)
+/models-src/

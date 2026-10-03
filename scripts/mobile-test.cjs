@@ -39,7 +39,12 @@ const log = (...a) => console.log(`[${tag}]`, ...a);
   page.on("response", (r) => { if (r.status() >= 400) errors.push("http " + r.status() + ": " + r.url()); });
   await page.goto(URL, { waitUntil: "load" });
   await page.waitForSelector("canvas", { timeout: 90000 });
-  await page.waitForTimeout(WARM);
+  // the loading screen stays up until the city is built and shaders compiled
+  const tGo = Date.now();
+  await page.waitForFunction(() => window.__td && window.__td.load().phase === "ready", null, { polling: 250, timeout: 240000 })
+    .catch(() => errors.push("never reached ready state"));
+  log(`ready (loading screen gone) after ${((Date.now() - tGo) / 1000).toFixed(1)} s`);
+  await page.waitForTimeout(Math.min(WARM, 3000));
   const speed = async () => Number((await page.locator("#speedo .num").textContent().catch(() => "-1"))?.trim());
   const world = () => page.evaluate(() => ({ ...window.__tdWorld }));
   const gfx = await page.evaluate(() => localStorage.getItem("td_gfx_quality") || "(default)");

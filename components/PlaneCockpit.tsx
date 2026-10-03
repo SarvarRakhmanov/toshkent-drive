@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import * as THREE from "three";
 import type { FlightState } from "@/lib/flightPhysics";
 import { PLANE_HANDLING } from "@/lib/flightPhysics";

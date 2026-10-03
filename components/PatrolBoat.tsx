@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useMemo, useState } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useThree } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import { RigidBody, type RapierRigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import { useKeyboard } from "@/lib/useKeyboard";
@@ -15,6 +16,7 @@ import { applyCameraRig } from "@/lib/cameraRig";
 import { WATER_LEVEL } from "@/components/Water";
 import { pierPush, clampToWater } from "@/lib/marina";
 import { BoatMirrors } from "@/components/BoatMirrors";
+import { tmpQuat, AXIS_Y, AXIS_Z } from "@/lib/scratch";
 
 // A second hull, moored at the marina — near-copy of Boat.tsx (same
 // direct-integration, no-character-controller design; see that file's class
@@ -74,9 +76,9 @@ export function PatrolBoat() {
 
     body.setNextKinematicTranslation({ x: pos.current.x, y, z: pos.current.z });
     const heel = clamp(boat.current.vLat / 9, -1, 1) * 0.16;
-    const q = new THREE.Quaternion()
-      .setFromAxisAngle(new THREE.Vector3(0, 1, 0), boat.current.h)
-      .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -heel));
+    const q = tmpQuat()
+      .setFromAxisAngle(AXIS_Y, boat.current.h)
+      .multiply(tmpQuat().setFromAxisAngle(AXIS_Z, -heel));
     body.setNextKinematicRotation(q);
 
     vehicleState.patrolBoat.x = pos.current.x;

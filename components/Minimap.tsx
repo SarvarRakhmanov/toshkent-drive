@@ -60,8 +60,13 @@ export function Minimap() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const draw = () => {
+    // ~15 Hz is plenty for a minimap and saves a full 2D-canvas redraw on
+    // 3 of every 4 frames (canvas 2D path work is main-thread time on phones)
+    let lastDraw = -1e9;
+    const draw = (t: number) => {
       raf.current = requestAnimationFrame(draw);
+      if (t - lastDraw < 66) return;
+      lastDraw = t;
       const { px, pz, heading } = worldState;
       const nav = useHudStore.getState().navTarget;
 

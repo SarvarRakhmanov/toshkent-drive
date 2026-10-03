@@ -1,6 +1,6 @@
 "use client";
 
-import { useFrame } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import { worldState } from "@/lib/worldState";
 import { useHudStore } from "@/lib/hudStore";
 

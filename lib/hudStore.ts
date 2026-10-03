@@ -66,6 +66,31 @@ export const BOAT_KINDS: readonly VehicleKind[] = ["boat", "boat2", "boat3", "pa
 
 let msgTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Per-frame HUD feeds (speed, nitro, waypoint) are called from useFrame 60×/s.
+// Each set() re-renders the subscribed React HUD, so they are throttled here to
+// ~10 Hz (HUD_HZ) — state flips that matter instantly (grounded, nitro on/off)
+// still go through immediately. A trailing timer flushes the final value so a
+// car that stops dead never shows a stale speed.
+const HUD_INTERVAL = 100;
+const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+function throttled<A extends unknown[]>(apply: (...a: A) => void, urgent?: (...a: A) => boolean) {
+  let last = -1e9;
+  let pending: A | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return (...a: A) => {
+    const t = now();
+    if ((urgent && urgent(...a)) || t - last >= HUD_INTERVAL) {
+      last = t;
+      pending = null;
+      if (timer) { clearTimeout(timer); timer = null; }
+      apply(...a);
+      return;
+    }
+    pending = a;
+    if (!timer) timer = setTimeout(() => { timer = null; if (pending) { last = now(); const p = pending; pending = null; apply(...p); } }, HUD_INTERVAL);
+  };
+}
+
 interface HudState {
   speedKmh: number;
   grounded: boolean;
@@ -166,7 +191,10 @@ export const useHudStore = create<HudState>((set, get) => ({
   hasGun: false,
   hasTicket: false,
   lookSensitivity: 1,
-  setHud: (speedKmh, grounded) => set({ speedKmh, grounded }),
+  setHud: throttled(
+    (speedKmh: number, grounded: boolean) => { const s = get(); if (s.speedKmh !== speedKmh || s.grounded !== grounded) set({ speedKmh, grounded }); },
+    (_k: number, grounded: boolean) => get().grounded !== grounded,
+  ),
   // no-ops while on foot — B is this build's own quick-switch between owned
   // vehicles, not a thing while walking (mount via E near a vehicle instead)
   toggleActive: () =>
@@ -188,9 +216,12 @@ export const useHudStore = create<HudState>((set, get) => ({
     if (msgTimer) clearTimeout(msgTimer);
     msgTimer = setTimeout(() => set({ msg: null }), 2200);
   },
-  setNitro: (fuel, active) => set({ nitroFuel: fuel, nitroActive: active }),
+  setNitro: throttled(
+    (fuel: number, active: boolean) => { const s = get(); if (Math.abs(s.nitroFuel - fuel) > 0.004 || s.nitroActive !== active) set({ nitroFuel: fuel, nitroActive: active }); },
+    (_f: number, active: boolean) => get().nitroActive !== active,
+  ),
   setClock: (c) => set({ clock: c }),
-  setWaypoint: (dist, deg) => set({ waypointDist: dist, waypointDeg: deg }),
+  setWaypoint: throttled((dist: number, deg: number) => set({ waypointDist: dist, waypointDeg: deg })),
   setNavTarget: (l) => set({ navTarget: l, mapOpen: false }),
   setMapOpen: (open) => set({ mapOpen: open }),
   setPhoneOpen: (open) => set({ phoneOpen: open }),

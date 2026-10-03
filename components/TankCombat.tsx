@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import * as THREE from "three";
 import { fireQueue } from "@/lib/tankShell";
 import { spawnDebris } from "@/lib/debris";

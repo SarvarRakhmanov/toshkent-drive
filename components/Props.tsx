@@ -1,10 +1,9 @@
 "use client";
 
 import { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import { RigidBody, type RapierRigidBody } from "@react-three/rapier";
 import * as THREE from "three";
-import { debrisQueue, type DebrisBurst } from "@/lib/debris";
 
 // First real dynamic (non-kinematic) bodies in the game — every mover
 // (Car/Bike/PoliceCar/Player) is a kinematic body driven by hand-rolled
@@ -112,7 +111,13 @@ function Prop({ spec }: { spec: PropSpec }) {
     if (!body) return;
     // fell through the world (its chunk's ground unmounted while far from the
     // player, or it got knocked off an edge) — put it back home, at rest
-    if (body.translation().y < -2) {
+    // or got squeezed between two kinematic cars (infinite mass on both
+    // sides) and the solver launched it — reset instead of letting a
+    // runaway/NaN velocity reach the broad phase
+    const t = body.translation();
+    const v = body.linvel();
+    const bad = !Number.isFinite(t.x + t.y + t.z + v.x + v.y + v.z) || v.x * v.x + v.y * v.y + v.z * v.z > 60 * 60 || Math.abs(t.x - home.x) > 300 || Math.abs(t.z - home.z) > 300;
+    if (t.y < -2 || bad) {
       body.setTranslation(home, true);
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       body.setAngvel({ x: 0, y: 0, z: 0 }, true);
@@ -139,97 +144,12 @@ function Prop({ spec }: { spec: PropSpec }) {
   );
 }
 
-const DEBRIS_POOL_SIZE = 12;
-const DEBRIS_LIFETIME = 3; // seconds before a fragment recycles back to its parking spot
-const PARK_Y = -50; // hidden well below the world; also naturally sleeps (out of view, no contacts)
-
-interface DebrisSlot {
-  body: RapierRigidBody | null;
-  age: number; // seconds since last burst; Infinity while parked/idle
-}
-
-function DebrisPool() {
-  const slots = useRef<DebrisSlot[]>(Array.from({ length: DEBRIS_POOL_SIZE }, () => ({ body: null, age: Infinity })));
-  const nextSlot = useRef(0);
-
-  function fireFragments(burst: DebrisBurst) {
-    // 4-6 fragments per burst, scaled by impact power; spray back the way the
-    // impact came from (away from the wall), not through it
-    const count = 4 + Math.round(burst.power * 2);
-    for (let i = 0; i < count; i++) {
-      const slot = slots.current[nextSlot.current];
-      nextSlot.current = (nextSlot.current + 1) % DEBRIS_POOL_SIZE;
-      const body = slot.body;
-      if (!body) continue;
-      const spread = (Math.random() - 0.5) * 0.6;
-      const bx = -burst.dx + spread;
-      const bz = -burst.dz + spread;
-      const len = Math.hypot(bx, bz) || 1;
-      body.setTranslation(
-        { x: burst.x + (Math.random() - 0.5) * 0.4, y: Math.max(0.3, burst.y), z: burst.z + (Math.random() - 0.5) * 0.4 },
-        true,
-      );
-      body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
-      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-      const mass = 1;
-      body.applyImpulse(
-        { x: (bx / len) * burst.power * 6 * mass, y: burst.power * 4 * mass, z: (bz / len) * burst.power * 6 * mass },
-        true,
-      );
-      body.applyTorqueImpulse(
-        { x: (Math.random() - 0.5) * 2, y: (Math.random() - 0.5) * 2, z: (Math.random() - 0.5) * 2 },
-        true,
-      );
-      slot.age = 0;
-    }
-  }
-
-  useFrame((_, dt) => {
-    // drain any bursts queued this frame (Car/Bike/PoliceCar's checkCrashDebris)
-    while (debrisQueue.length) {
-      const burst = debrisQueue.shift() as DebrisBurst;
-      fireFragments(burst);
-    }
-    // age active fragments, park them once their lifetime is up
-    for (const slot of slots.current) {
-      if (!slot.body || slot.age === Infinity) continue;
-      slot.age += dt;
-      if (slot.age > DEBRIS_LIFETIME) {
-        slot.body.setTranslation({ x: 0, y: PARK_Y, z: 0 }, true);
-        slot.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        slot.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-        slot.age = Infinity;
-      }
-    }
-  });
-
-  return (
-    <>
-      {Array.from({ length: DEBRIS_POOL_SIZE }, (_, i) => (
-        <RigidBody
-          key={i}
-          ref={(el) => {
-            slots.current[i].body = el;
-          }}
-          type="dynamic"
-          position={[0, PARK_Y, 0]}
-          colliders="cuboid"
-          mass={1}
-          restitution={0.3}
-          friction={0.5}
-          linearDamping={0.4}
-          angularDamping={0.9}
-        >
-          <mesh castShadow>
-            <boxGeometry args={[0.22, 0.22, 0.22]} />
-            <meshStandardMaterial color="#6a6a70" roughness={0.7} />
-          </mesh>
-        </RigidBody>
-      ))}
-    </>
-  );
-}
+// (The old DebrisPool — 12 dynamic Rapier boxes parked on top of each other
+// at y=-50 and teleported into every crash — is gone: a crash between the
+// player's kinematic car and a kinematic traffic car squeezed those fragments
+// between two infinite-mass bodies, the solver blew their velocities up to
+// NaN and the physics world locked up ~2 s after the hit. components/Debris.tsx
+// already draws the same burst as pooled, physics-free VFX.)
 
 export function Props() {
   return (
@@ -237,7 +157,6 @@ export function Props() {
       {PROP_SPECS.map((spec, i) => (
         <Prop key={i} spec={spec} />
       ))}
-      <DebrisPool />
     </>
   );
 }

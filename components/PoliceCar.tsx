@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useEffect, useMemo, useState, type RefObject } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useThree } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import { RigidBody, CuboidCollider, useRapier, type RapierRigidBody, type RapierCollider } from "@react-three/rapier";
 import * as THREE from "three";
 import { useKeyboard } from "@/lib/useKeyboard";
@@ -21,6 +22,7 @@ import { clampFromWater, groundYAt } from "@/lib/marina";
 import { POLICE_SWEEP_GROUPS } from "@/lib/collisionGroups";
 import { QueryFilterFlags, type KinematicCharacterController } from "@dimforge/rapier3d-compat";
 import type { VehicleKind } from "@/lib/hudStore";
+import { tmpQuat, AXIS_Y } from "@/lib/scratch";
 
 const GRAVITY_PULL = -12;
 
@@ -48,6 +50,7 @@ export function PoliceCar({ kind = "policeCar" }: { kind?: VehicleKind } = {}) {
 
   const [save] = useState(() => loadSave()?.vehicles[kind] ?? null);
   const car = useRef<CarState>({ h: save?.h ?? vehicleState[kind].h, speed: 0, vLat: 0, steerAng: 0 });
+  const restFrames = useRef(0);
   const nitro = useRef(initNitroFuel());
   const fallSpeed = useRef(0);
   const crashCooldown = useRef(0);
@@ -107,6 +110,12 @@ export function PoliceCar({ kind = "policeCar" }: { kind?: VehicleKind } = {}) {
       d
     );
 
+    // parked & settled: skip the character-controller sweep entirely (every
+
+    // parked vehicle used to shape-cast against the world every frame)
+
+    if (!isActive && Math.abs(car.current.speed) < 0.02 && Math.abs(car.current.vLat) < 0.02 && restFrames.current > 30) return;
+
     fallSpeed.current += GRAVITY_PULL * d;
     // see Car.tsx: EXCLUDE_DYNAMIC lets the cruiser plow through props instead
     // of sliding/stopping on them, while the solver still shoves the prop aside.
@@ -121,6 +130,8 @@ export function PoliceCar({ kind = "policeCar" }: { kind?: VehicleKind } = {}) {
     controller.computeColliderMovement(collider, { x: dx, y: fallSpeed.current * d, z: dz }, QueryFilterFlags.EXCLUDE_DYNAMIC, POLICE_SWEEP_GROUPS);
     const grounded = controller.computedGrounded();
     if (grounded) fallSpeed.current = 0;
+
+    restFrames.current = !isActive && grounded && Math.abs(car.current.speed) < 0.02 ? restFrames.current + 1 : 0;
     const movement = controller.computedMovement();
 
     const t = body.translation();
@@ -139,7 +150,7 @@ export function PoliceCar({ kind = "policeCar" }: { kind?: VehicleKind } = {}) {
     }
 
     body.setNextKinematicTranslation(nextPos);
-    body.setNextKinematicRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), car.current.h));
+    body.setNextKinematicRotation(tmpQuat().setFromAxisAngle(AXIS_Y, car.current.h));
 
     if (isActive) {
       checkCrashDebris(crashCooldown, d, { x: dx, z: dz }, { x: movement.x, z: movement.z }, Math.abs(car.current.speed), nextPos, car.current.h);

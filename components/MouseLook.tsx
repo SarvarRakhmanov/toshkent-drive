@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useThree } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import {
   cameraLook,
   wrapAngle,

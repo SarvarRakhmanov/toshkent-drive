@@ -271,3 +271,16 @@ html.td-touch #vig { background: radial-gradient(ellipse at center, transparent 
 
 #tc-rotate { position: absolute; top: calc(var(--st) + 72px); left: var(--sl); pointer-events: auto; touch-action: none; padding: 5px 10px; border-radius: 999px; background: rgba(10, 12, 20, 0.7); border: 1px solid rgba(255, 255, 255, 0.22); font: 600 10px/1.2 system-ui, sans-serif; color: rgba(255, 255, 255, 0.85); }
 #tc-rotate b { margin-left: 6px; color: #ffd76a; }
+
+/* boot loading screen (components/LoadingScreen.tsx) */
+#td-loading {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  background: #050814; color: #fff; font-family: monospace;
+  transition: opacity 0.4s ease;
+}
+#td-loading.td-loading-out { opacity: 0; pointer-events: none; }
+.td-loading-title { font-size: clamp(22px, 6vw, 40px); letter-spacing: 0.12em; font-weight: 700; color: #ffd76a; }
+.td-loading-bar { width: min(70vw, 360px); height: 6px; border-radius: 3px; background: #1b2236; overflow: hidden; }
+.td-loading-bar > div { height: 100%; width: 100%; background: linear-gradient(90deg, #2fb8ff, #ffd76a); transform-origin: left; transition: transform 0.25s ease; }
+.td-loading-label { font-size: 13px; opacity: 0.75; }

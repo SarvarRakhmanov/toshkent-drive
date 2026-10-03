@@ -1,7 +1,7 @@
 "use client";
 
 import type { RefObject } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import { RigidBody, CuboidCollider } from "@react-three/rapier";
 import * as THREE from "three";
 import { useHudStore } from "@/lib/hudStore";

@@ -32,3 +32,15 @@ GitHub Pages: `.github/workflows/pages.yml` builds with `BASE_PATH=/<repo>` and 
 simulated keys and saves screenshots to `shots/`.
 
 `legacy-grok/` holds the original Grok Build version's source for reference.
+
+## Performance & stability (v1.2)
+
+- **Quality tiers** (`lib/gfx.ts`): LOW is the default on phones. It uses pixel ratio ≤ 1, no shadows, no post-processing or MSAA, short fog with a matching far plane, fewer traffic lanes and 2 pooled point lights. HIGH on desktop keeps soft shadows, the HDR environment, N8AO, bloom and SMAA. `?q=high|low` forces a tier. Auto-quality drops HIGH → LOW and then lowers the pixel ratio when the game holds under 30 fps (turn it off with `?autoq=0`).
+- **Loading screen**: the world mounts in stages behind the loader. Every shader is precompiled, including objects that are hidden at boot (crash debris, culled NPCs), and the game is shown only once it is ready.
+- **Crash safety**: every `useFrame` goes through `lib/safeFrame.ts` (try/catch and dt ≤ 0.1 s). `lib/physicsGuard.ts` rejects NaN or huge Rapier inputs and caps impulses. `gl.render` is guarded. A frame watchdog remounts the canvas after a lost GL context.
+- **Assets**: `node scripts/optimize-models.mjs` rebuilds `public/models/*` (meshopt, WebP, simplification, transmission/specGloss removal) from untouched originals in `models-src/`, which is git-ignored. Use `ONLY=bmw|k5` to rebuild a subset.
+- **Tests** (Playwright, serve `out/` at `/toshkent-drive/` on :4173):
+  - `scripts/mobile-test.cjs`: touch controls and HUD overlap in portrait or landscape
+  - `scripts/smoke.cjs`: desktop drive
+  - `scripts/perf-profile.cjs`: draw calls, triangles, load time, bytes and heap
+  - `scripts/crash-test.cjs`: high-speed crashes into NPC and police cars; the render loop must keep running

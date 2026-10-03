@@ -1,6 +1,6 @@
 "use client";
 
-import { useFrame } from "@react-three/fiber";
+import { useFrame } from "@/lib/safeFrame";
 import { updateEngineAudio } from "@/lib/audio";
 import { useHudStore } from "@/lib/hudStore";
 

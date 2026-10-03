@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { asset } from "@/lib/asset";
 import { RIDE_HEIGHT } from "@/components/SupercarBody";
 import { PLAYER_CARS, usePlayerCarStore } from "@/lib/playerCar";
+import { noTransmission } from "@/components/ReadyGate";
 
 // Toshkent Drive: real GLB car bodies (the player's own cars + CC-BY traffic
 // cars from the Grok Build project) dropped into this engine's car rigs.
@@ -34,6 +35,7 @@ function prepare(scene: THREE.Object3D, rotY: number, length: number, paint: Reg
     if ((o as THREE.Light).isLight || (o as THREE.Camera).isCamera) junk.push(o);
   });
   junk.forEach((o) => o.removeFromParent());
+  noTransmission(model);
   const wrap = new THREE.Group();
   model.rotation.y = rotY;
   wrap.add(model);

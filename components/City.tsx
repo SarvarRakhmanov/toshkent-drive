@@ -1,8 +1,8 @@
 "use client";
 
 import { asset } from "@/lib/asset";
-import { useMemo, useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useFrame } from "@/lib/safeFrame";
 import { RigidBody, CylinderCollider } from "@react-three/rapier";
 import { Instances, Instance } from "@react-three/drei";
 import * as THREE from "three";
@@ -12,6 +12,7 @@ import { loadSave } from "@/lib/saveGame";
 import { LANDMARKS } from "@/lib/landmarks";
 import { CLUB_IN } from "@/lib/club";
 import { HIGHWAY_CHUNKS } from "@/lib/highway";
+import { isReady } from "@/lib/loadState";
 
 // Real chunk-streamed city (Milestone 5), replacing the placeholder 7-box
 // arena from Phase 1. Same constants and the same seeded-PRNG-per-chunk
@@ -664,7 +665,7 @@ for (let di = -AIRPORT_CHUNK_RADIUS; di <= AIRPORT_CHUNK_RADIUS; di++) {
 
 // New chunks needed this many at a time per frame, once a boundary crossing
 // queues them — see the ADD_PER_FRAME note in City() below.
-const ADD_PER_FRAME = 2;
+const ADD_PER_FRAME = 1; // one chunk (≈250 meshes + colliders) per frame keeps boundary crossings hitch-free on phones
 
 export function City() {
   const [chunks, setChunks] = useState<string[]>(() => initialChunks());
@@ -734,10 +735,33 @@ export function City() {
       {chunks.map((key) => {
         const [ci, cj] = key.split(",").map(Number);
         if (ci >= SHORE_CI) return null; // open water — Water.tsx already covers this area
-        return <Chunk key={key} ci={ci} cj={cj} />;
+        return (
+          <ChunkCull key={key} ci={ci} cj={cj}>
+            <Chunk ci={ci} cj={cj} />
+          </ChunkCull>
+        );
       })}
     </>
   );
+}
+
+// Hides a whole chunk (its ~200-300 meshes) once it's entirely beyond the
+// camera's far plane (= fog end, see SceneTools' FogFarSync) — saves the
+// renderer walking and frustum-testing every mesh in the far ring.
+function ChunkCull({ ci, cj, children }: { ci: number; cj: number; children: ReactNode }) {
+  const ref = useRef<THREE.Group>(null);
+  const tick = useRef((ci * 7 + cj * 3) & 7); // stagger the checks across frames
+  useFrame((state) => {
+    const g = ref.current;
+    if (!g || (tick.current++ & 7) !== 0) return;
+    if (!isReady()) { g.visible = true; return; }
+    const half = CELL / 2;
+    const dx = Math.max(0, Math.abs(state.camera.position.x - ci * CELL) - half);
+    const dz = Math.max(0, Math.abs(state.camera.position.z - cj * CELL) - half);
+    const far = (state.camera as THREE.PerspectiveCamera).far;
+    g.visible = dx * dx + dz * dz < (far + 15) * (far + 15);
+  });
+  return <group ref={ref}>{children}</group>;
 }
 
 // The ring that exists on the very first React commit, BEFORE the streamer in
