@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { asset } from "@/lib/asset";
@@ -8,6 +8,10 @@ import { RIDE_HEIGHT } from "@/components/SupercarBody";
 import { PLAYER_CARS, usePlayerCarStore, type PlayerCarDef } from "@/lib/playerCar";
 import { noTransmission } from "@/components/ReadyGate";
 import { coatScene } from "@/lib/weatherCoat";
+import { rigWheels, type WheelRig } from "@/lib/wheelRig";
+
+/** the active player car's wheel rig (posed by components/Car.tsx) */
+export const playerWheels: { rig: WheelRig | null } = { rig: null };
 
 // Toshkent Drive: real GLB car bodies (the player's own cars + CC-BY traffic
 // cars from the Grok Build project) dropped into this engine's car rigs.
@@ -179,10 +183,14 @@ function addPlates(wrap: THREE.Object3D, plate: NonNullable<PlayerCarDef["plate"
 function preparePlayer(def: PlayerCarDef, scene: THREE.Object3D) {
   const obj = prepare(scene, def.rotY, def.length, def.paint, def.color, false, true);
   obj.name = `td-car:${def.id}`;
-  if (def.plate) {
-    obj.position.y += RIDE_HEIGHT; // addPlates raycasts with the road at world y=0
-    addPlates(obj, def.plate);
-    obj.position.y -= RIDE_HEIGHT;
+  obj.position.y += RIDE_HEIGHT; // plates + wheel rig work with the road at world y=0
+  const rig = rigWheels(obj, def.phys?.wheelRadius ?? 0.32);
+  if (def.plate) addPlates(obj, def.plate);
+  obj.position.y -= RIDE_HEIGHT;
+  obj.userData.wheelRig = rig;
+  if (typeof window !== "undefined") {
+    const w = window as unknown as { __tdWheels?: Record<string, unknown> };
+    (w.__tdWheels ??= {})[def.id] = rig ? { radius: +rig.radius.toFixed(3), wheels: rig.wheels.map((x) => ({ p: x.steer.position.toArray().map((v) => +v.toFixed(2)), r: +x.radius.toFixed(3), parts: x.spin.children.length + x.steer.children.length - 1 })) } : null;
   }
   return obj;
 }
@@ -193,6 +201,11 @@ export function PlayerGlbCar() {
   const def = PLAYER_CARS[index];
   const gltf = useGLTF(asset(def.url));
   const obj = useMemo(() => preparePlayer(def, gltf.scene), [gltf, def]);
+  useLayoutEffect(() => {
+    playerWheels.rig = (obj.userData.wheelRig as WheelRig | null) ?? null;
+    (window as unknown as { __tdWheelPose?: () => unknown }).__tdWheelPose = () => playerWheels.rig?.wheels.map((w) => ({ steer: +w.steer.rotation.y.toFixed(3), spin: +w.spin.rotation.x.toFixed(3) })) ?? null;
+    return () => { if (playerWheels.rig === obj.userData.wheelRig) playerWheels.rig = null; };
+  }, [obj]);
   return <primitive object={obj} />;
 }
 

@@ -26,11 +26,15 @@ function Speedo() {
   const active = useHudStore((s) => s.active);
   const speedKmh = useHudStore((s) => s.speedKmh);
   const vehicleName = useHudStore((s) => s.vehicleName());
+  const gear = useHudStore((s) => s.gear);
+  const rpmFrac = useHudStore((s) => s.rpmFrac);
   if (active === "foot") return null;
+  const isCar = active === "car";
   return (
     <div id="speedo" style={{ display: "block" }}>
       <div className="num">{speedKmh}</div>
-      <div className="unit">KM/H</div>
+      <div className="unit">KM/H{isCar && <span className="gear">{gear < 0 ? "R" : speedKmh < 1 && gear === 1 ? "N" : gear}</span>}</div>
+      {isCar && <div className="rpm"><div className={rpmFrac > 0.92 ? "fill red" : "fill"} style={{ width: `${Math.round(rpmFrac * 100)}%` }} /></div>}
       <div className="veh">{vehicleName}</div>
     </div>
   );

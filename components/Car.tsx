@@ -1,14 +1,16 @@
 "use client";
 
 import { useRef, useEffect, useMemo, useState, Suspense } from "react";
-import { PlayerGlbCar } from "@/components/GlbCar";
+import { PlayerGlbCar, playerWheels } from "@/components/GlbCar";
 import { useThree } from "@react-three/fiber";
 import { useFrame } from "@/lib/safeFrame";
 import { RigidBody, CuboidCollider, useRapier, type RapierRigidBody, type RapierCollider } from "@react-three/rapier";
 import { VEHICLE_BODY_GROUPS, VEHICLE_SWEEP_GROUPS } from "@/lib/collisionGroups";
 import * as THREE from "three";
 import { useKeyboard } from "@/lib/useKeyboard";
-import { stepCarPhysics, DEFAULT_HANDLING, type CarState, type CarHandling } from "@/lib/carPhysics";
+import type { CarState } from "@/lib/carPhysics";
+import { poseWheels } from "@/lib/wheelRig";
+import { stepDynamics, rampSteer, newDynState, effectiveSpec, applyImpact, engineTelemetry, STOCK, type VehicleSpec } from "@/lib/vehicleDynamics";
 import { useHudStore } from "@/lib/hudStore";
 import { worldState } from "@/lib/worldState";
 import { fellOutOfWorld } from "@/lib/fallGuard";
@@ -59,6 +61,10 @@ export function Car() {
   const nitroLocked = useRef(false); // true from empty tank until a full recharge — blocks re-triggering on a half-full tank
   const camPos = useRef(new THREE.Vector3(0, 4, -10));
   const camLook = useRef(new THREE.Vector3());
+  // v1.6 driving physics state + the per-car spec (lib/playerCar.ts `phys`)
+  const dyn = useRef(newDynState());
+  const visBody = useRef<THREE.Group>(null);
+  const specCache = useRef<{ index: number; spec: VehicleSpec } | null>(null);
   const controllerRef = useRef<KinematicCharacterController | null>(null);
 
   useEffect(() => {
@@ -94,6 +100,7 @@ export function Car() {
     if (carSummon.pending) {
       carSummon.pending = false;
       destroyedUntil.current = 0;
+      dyn.current = newDynState(); // a reset / mechanic call also repairs the car
       body.setTranslation({ x: carSummon.x, y: RIDE_HEIGHT, z: carSummon.z }, true);
       car.current.h = carSummon.h;
       car.current.speed = 0;
@@ -170,22 +177,39 @@ export function Car() {
     nitroFuel.current = nitroOn
       ? Math.max(0, nitroFuel.current - d)
       : Math.min(NITRO_MAX, nitroFuel.current + d * 0.5);
-    const handling: CarHandling = nitroOn
-      ? { ...DEFAULT_HANDLING, accel: DEFAULT_HANDLING.accel * 2.7, max: DEFAULT_HANDLING.max + NITRO_BOOST }
-      : DEFAULT_HANDLING;
     if (isActive) useHudStore.getState().setNitro(nitroFuel.current / NITRO_MAX, nitroOn);
 
-    const { dx, dz } = stepCarPhysics(
+    // v1.6: tyre/suspension/gearbox model (lib/vehicleDynamics.ts)
+    const carIdx = usePlayerCarStore.getState().index;
+    if (!specCache.current || specCache.current.index !== carIdx) specCache.current = { index: carIdx, spec: effectiveSpec(PLAYER_CARS[carIdx]?.phys, STOCK) };
+    const hb = isActive && k.handbrake;
+    rampSteer(car.current, steer, hb, d);
+    const bt = body.translation();
+    const { dx, dz } = stepDynamics(
       car.current,
+      dyn.current,
+      specCache.current.spec,
       {
-        forward: isActive && k.forward,
-        back: isActive && k.back,
-        steer,
-        handbrake: isActive && k.handbrake,
+        throttle: isActive && k.forward ? 1 : 0,
+        brake: isActive && k.back ? 1 : 0,
+        steer: car.current.steerAng,
+        handbrake: hb,
+        nitro: nitroOn,
+        park: !isActive,
       },
-      handling,
-      d
+      d,
+      bt.x,
+      bt.z,
+      groundYAt
     );
+    if (isActive) engineTelemetry.active = true;
+    if (isActive) useHudStore.getState().setEngine(dyn.current.gear, dyn.current.rpm / specCache.current.spec.redline);
+    if (visBody.current) {
+      visBody.current.rotation.set(dyn.current.pitch, 0, dyn.current.roll);
+      visBody.current.position.y = dyn.current.heave * 0.5;
+    }
+    // v1.6 wheels: roll by v/r, fronts yaw with the road-wheel angle
+    if (isActive && playerWheels.rig) poseWheels(playerWheels.rig, car.current.speed, dyn.current.delta, d, hb, dyn.current.wheelspin * 0.8);
 
     // ground snap: small constant fall fed into the character controller, which
     // clamps it back to zero the instant it detects the floor (see enableSnapToGround)
@@ -245,6 +269,13 @@ export function Car() {
       if (want > 0.02 && got < want * 0.5) {
         car.current.speed *= Math.max(0.15, got / want);
         car.current.vLat *= 0.5;
+        dyn.current.r *= 0.3;
+        // simple damage: speed lost in the hit (lib/vehicleDynamics.ts applyImpact)
+        if (isActive) {
+          const before = dyn.current.damage;
+          const after = applyImpact(dyn.current, preHitSpeed - Math.abs(car.current.speed));
+          if (Math.floor(after * 10) > Math.floor(before * 10)) useHudStore.getState().showMsg(`DAMAGE ${Math.round(after * 100)}%`);
+        }
       }
     }
 
@@ -372,7 +403,10 @@ export function Car() {
       {/* keyed on the stolen paint so the mesh remounts when you take over a
           traffic car — CarMesh pins colour/style at mount (useState), so a
           prop change alone would not repaint an already-mounted body */}
-      <StolenAwareCarMesh />
+      {/* suspension pose (pitch / roll / heave) from lib/vehicleDynamics.ts */}
+      <group ref={visBody}>
+        <StolenAwareCarMesh />
+      </group>
       {/* cockpit interior (dash/wheel/gauges) — only ever visible in camMode
           1, gated per-frame inside CarInterior itself; see cameraRig.ts's
           camMode===1 branch for the eye position this is anchored to */}

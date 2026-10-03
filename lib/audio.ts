@@ -4,11 +4,20 @@
 // inherently imperative and only ever need one instance for the whole page,
 // same spirit as the original's single `audio` object.
 
+import { ENGINE_PROFILES, type EngineProfileId } from "@/lib/engineSound";
+
 interface AudioRig {
   ctx: AudioContext;
   gain: GainNode;
-  osc: OscillatorNode;
-  osc2: OscillatorNode;
+  filt: BiquadFilterNode;
+  osc: OscillatorNode; // fire (saw)
+  osc2: OscillatorNode; // sub (square)
+  osc3: OscillatorNode; // whine (sine)
+  gFire: GainNode;
+  gSub: GainNode;
+  gWhine: GainNode;
+  gNoise: GainNode;
+  noiseBp: BiquadFilterNode;
   nitroGain: GainNode;
   nFilt: BiquadFilterNode;
 }
@@ -22,21 +31,42 @@ export function initAudio() {
   try {
     const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ctx = new Ctx();
+    // v1.6 engine voice: 3 oscillators + looped noise, each through its own
+    // layer gain, summed into one low-pass (see lib/engineSound.ts profiles)
     const osc = ctx.createOscillator();
     osc.type = "sawtooth";
     const osc2 = ctx.createOscillator();
     osc2.type = "square";
+    const osc3 = ctx.createOscillator();
+    osc3.type = "sine";
     const filt = ctx.createBiquadFilter();
     filt.type = "lowpass";
     filt.frequency.value = 420;
+    filt.Q.value = 1.2;
     const gain = ctx.createGain();
     gain.gain.value = 0;
-    osc.connect(filt);
-    osc2.connect(filt);
+    const gFire = ctx.createGain(), gSub = ctx.createGain(), gWhine = ctx.createGain(), gNoise = ctx.createGain();
+    gFire.gain.value = 0.8; gSub.gain.value = 0.3; gWhine.gain.value = 0; gNoise.gain.value = 0;
+    osc.connect(gFire).connect(filt);
+    osc2.connect(gSub).connect(filt);
+    osc3.connect(gWhine).connect(gain); // whine bypasses the low-pass
+    const nbuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const nd = nbuf.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource();
+    noise.buffer = nbuf;
+    noise.loop = true;
+    const noiseBp = ctx.createBiquadFilter();
+    noiseBp.type = "bandpass";
+    noiseBp.frequency.value = 800;
+    noiseBp.Q.value = 0.9;
+    noise.connect(noiseBp).connect(gNoise).connect(gain);
     filt.connect(gain);
     gain.connect(ctx.destination);
     osc.start();
     osc2.start();
+    osc3.start();
+    noise.start();
 
     // dedicated NITRO roar voice (bandpassed saw+square swell while boosting)
     const nOsc = ctx.createOscillator();
@@ -58,7 +88,7 @@ export function initAudio() {
     nOsc.start();
     nOsc2.start();
 
-    audio = { ctx, gain, osc, osc2, nitroGain, nFilt };
+    audio = { ctx, gain, filt, osc, osc2, osc3, gFire, gSub, gWhine, gNoise, noiseBp, nitroGain, nFilt };
     if (muted) ctx.suspend();
   } catch {
     // Web Audio unavailable — game stays fully playable without sound
@@ -106,13 +136,28 @@ export function setMuted(v: boolean) {
  * gain (0.02 baseline below, even at 0 speed) means "frozen at 0" still
  * wouldn't have been silent either — this has to be an explicit gate, not
  * just passing 0 for speed. */
-export function updateEngineAudio(speedKmh: number, driving: boolean, nitroActive: boolean) {
+export function updateEngineAudio(speedKmh: number, driving: boolean, nitroActive: boolean, rpm: number, throttle: number, profileId: EngineProfileId) {
   if (!audio) return;
   const drv = driving ? speedKmh / 3.6 : 0; // back to m/s, matches the original's Math.abs(v.speed)
-  const g = !muted && driving ? clamp(0.02 + drv * 0.0008, 0, 0.06) : 0;
-  audio.osc.frequency.setTargetAtTime(48 + drv * 2.4, audio.ctx.currentTime, 0.05);
-  audio.osc2.frequency.setTargetAtTime(24 + drv * 1.2, audio.ctx.currentTime, 0.05);
-  audio.gain.gain.setTargetAtTime(g, audio.ctx.currentTime, 0.08);
+  // v1.6: per-vehicle synthesized engine (lib/engineSound.ts). Pitch = firing
+  // frequency rpm/60*cyl/2 so gear shifts are audible; the low-pass opens and
+  // the volume rises with rpm and throttle.
+  const p = ENGINE_PROFILES[profileId];
+  const t = audio.ctx.currentTime;
+  const rev = clamp((rpm - p.idle) / (p.redline - p.idle), 0, 1);
+  const thr = clamp(throttle, 0, 1);
+  const fire = clamp((rpm / 60) * (p.cyl / 2), 18, 520);
+  audio.osc.frequency.setTargetAtTime(fire, t, 0.03);
+  audio.osc2.frequency.setTargetAtTime(fire * 0.5, t, 0.03);
+  audio.osc3.frequency.setTargetAtTime(Math.min(5000, fire * p.whineOrder), t, 0.05);
+  audio.filt.frequency.setTargetAtTime(p.cutoff + p.cutoffRev * rev * (0.45 + 0.55 * thr), t, 0.05);
+  audio.noiseBp.frequency.setTargetAtTime(p.noiseHz * (0.7 + 0.6 * rev), t, 0.08);
+  audio.gFire.gain.setTargetAtTime(p.fire, t, 0.1);
+  audio.gSub.gain.setTargetAtTime(p.sub, t, 0.1);
+  audio.gWhine.gain.setTargetAtTime(p.whine * (0.15 + 0.85 * rev) * 0.25, t, 0.08);
+  audio.gNoise.gain.setTargetAtTime(p.noise * (0.25 + 0.75 * thr) * (0.3 + 0.7 * rev) * 0.6, t, 0.08);
+  const g = !muted && driving ? p.volume * (0.38 + 0.37 * rev + 0.25 * thr) : 0;
+  audio.gain.gain.setTargetAtTime(g, t, 0.06);
 
   // TEMP TEST FLAG (2026-07-31, Akul): nitro roar reads as pure noise at high
   // RPM — muted here to test engine-only sound while that gets tuned. Revert

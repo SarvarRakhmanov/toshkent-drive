@@ -34,7 +34,61 @@ const JOBS = [
     drop: /glass/i,
     wheel: { name: /weel|wheel/i },
   },
+  // v1.6 per-type cabins (CC BY, see CREDITS.md)
+  {
+    // sedan: "2014 Toyota Corolla E180 EU (with interior)" by armoredwave
+    src: "new/corolla.glb", out: "interiors/sedan2-interior.glb", budget: 30000,
+    eye: [0.36, 1.12, -0.07], scale: 1, rotY: 0,
+    keep: [[-1.15, 0.12, -1.5], [1.15, 1.5, 1.7]],
+    // (headliner dropped: at the driver eye height it hid the top of the windscreen on phones)
+    drop: /glass|windows|wheels|tyre|lights?_|mirror_glass|klosz|car_plastic_grainy_gray/i,
+    recolor: { re: /main_paint/i, color: [0.07, 0.07, 0.075, 1] }, // body-colour trim inside -> charcoal
+    wheel: { name: /steering_wheel/i },
+  },
+  {
+    // SUV: "2019 Skoda Karoq" by BHP3D — wheel is baked into the dash mesh, split by triangles
+    src: "new/karoq.glb", out: "interiors/suv-interior.glb", budget: 32000,
+    eye: [-0.38, 1.42, 0.15], scale: 1, rotY: Math.PI,
+    keep: [[-1.15, 0.25, -1.25], [1.15, 1.95, 2.6]],
+    drop: /glass|^wheel|primary|^body|boot|door_ok|light|plate|grill/i,
+    wheel: { triBox: [[-0.62, 0.84, -0.56], [-0.14, 1.37, -0.2]], cyl: { hub: [-0.392, 1.127, -0.393], n: [-0.085, 0.426, 0.901], r: 0.2, back: 0.045, front: 0.1 }, nodes: /panel|interior/, rim: 0.18 },
+  },
 ];
+
+// v1.6: move the triangles fully inside `box` (source/world space) out of
+// the matching nodes into new wheel-flagged nodes (wheel baked into the dash)
+function splitTriangles(doc, box, nodeRe, cyl) {
+  const r = doc.getRoot();
+  let moved = 0;
+  for (const n of r.listNodes()) {
+    const mesh = n.getMesh();
+    if (!mesh || !nodeRe.test(n.getName())) continue;
+    const M = n.getWorldMatrix();
+    const wheelMesh = doc.createMesh("steering-wheel-part");
+    for (const p of mesh.listPrimitives()) {
+      const pos = p.getAttribute("POSITION"), idx = p.getIndices();
+      if (!idx) continue;
+      const v = [], keep = [], take = [];
+      const inBox = (i) => { pos.getElement(i, v); const x = M[0]*v[0]+M[4]*v[1]+M[8]*v[2]+M[12], y = M[1]*v[0]+M[5]*v[1]+M[9]*v[2]+M[13], z = M[2]*v[0]+M[6]*v[1]+M[10]*v[2]+M[14]; if (cyl) { const dx = x - cyl.hub[0], dy = y - cyl.hub[1], dz = z - cyl.hub[2]; const a = dx * cyl.n[0] + dy * cyl.n[1] + dz * cyl.n[2]; const rr = Math.hypot(dx - a * cyl.n[0], dy - a * cyl.n[1], dz - a * cyl.n[2]); return a >= -cyl.back && a <= cyl.front && rr <= cyl.r; } return x >= box[0][0] && x <= box[1][0] && y >= box[0][1] && y <= box[1][1] && z >= box[0][2] && z <= box[1][2]; };
+      for (let t = 0; t < idx.getCount(); t += 3) {
+        const a = idx.getScalar(t), b = idx.getScalar(t + 1), c = idx.getScalar(t + 2);
+        (inBox(a) && inBox(b) && inBox(c) ? take : keep).push(a, b, c);
+      }
+      if (!take.length) continue;
+      moved += take.length / 3;
+      const mk = (arr) => doc.createAccessor().setType("SCALAR").setArray(new Uint32Array(arr));
+      const q = p.clone();
+      q.setIndices(mk(take));
+      p.setIndices(mk(keep));
+      wheelMesh.addPrimitive(q);
+    }
+    if (wheelMesh.listPrimitives().length) {
+      const wn = doc.createNode("steering-wheel-part").setMesh(wheelMesh).setMatrix(n.getWorldMatrix()).setExtras({ wheel: true });
+      r.listScenes()[0].addChild(wn);
+    }
+  }
+  console.log(`  split ${moved} wheel triangles out of the dash`);
+}
 
 // Column axis of the steering wheel: smallest-variance direction of its
 // vertices (the rim's plane normal), by Jacobi eigen-decomposition.
@@ -66,14 +120,19 @@ for (const job of JOBS) {
   const r = doc.getRoot();
   const before = { tris: tris(doc), bytes: fs.statSync(input).size };
   let dropped = 0;
-  const isWheel = (n) => job.wheel.name ? job.wheel.name.test(n.getName()) : inside(getBounds(n), job.wheel.box);
-  for (const n of r.listNodes()) if (n.getMesh() && isWheel(n)) n.setExtras({ wheel: true });
+  if (job.wheel.triBox) splitTriangles(doc, job.wheel.triBox, job.wheel.nodes, job.wheel.cyl);
+  else {
+    const isWheel = (n) => job.wheel.name ? job.wheel.name.test(n.getName()) : inside(getBounds(n), job.wheel.box);
+    for (const n of r.listNodes()) if (n.getMesh() && isWheel(n)) n.setExtras({ wheel: true });
+  }
   for (const n of r.listNodes()) {
     const m = n.getMesh();
     if (!m) continue;
     const matName = m.listPrimitives().map((p) => p.getMaterial()?.getName() ?? "").join(" ");
-    if (job.drop.test(matName) || job.drop.test(n.getName()) || !inside(getBounds(n), job.keep)) { n.setMesh(null); dropped++; }
+    if (n.getExtras().wheel || (job.keepAlways && job.keepAlways.test(n.getName()))) continue;
+    if (job.drop.test(matName) || job.drop.test(n.getName()) || !inside(getBounds(n), job.keep)) { if (process.env.LOGDROP) console.log("   drop", n.getName(), matName); n.setMesh(null); dropped++; }
   }
+  if (job.recolor) for (const m of r.listMaterials()) if (job.recolor.re.test(m.getName())) { m.setBaseColorFactor(job.recolor.color); m.setMetallicFactor(0.1); m.setRoughnessFactor(0.6); }
   // no glass transmission on phones: strip the extensions, everything opaque, both faces
   for (const m of r.listMaterials()) {
     m.setExtension("KHR_materials_transmission", null);
@@ -130,7 +189,7 @@ for (const job of JOBS) {
     // rim radius (grip centreline) = 97th-percentile radial distance in the wheel plane, minus a bit
     const rad = []; for (const p of prims) { const a = p.getAttribute("POSITION"); const v = []; for (let i = 0; i < a.getCount(); i++) { a.getElement(i, v); rad.push(Math.hypot(v[0], v[1])); } }
     rad.sort((x, y) => x - y);
-    const rimRadius = rad[Math.floor(rad.length * 0.97)] * 0.93;
+    const rimRadius = job.wheel.rim ?? rad[Math.floor(rad.length * 0.97)] * 0.93;
     // pivot parent carries the hub transform; the mesh child stays identity so
     // meshopt's quantisation (which rewrites the mesh node's TRS) can't move the pivot
     wn.setName("steering-wheel-mesh");

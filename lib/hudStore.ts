@@ -101,6 +101,9 @@ interface HudState {
   msg: string | null;
   nitroFuel: number; // 0..1
   nitroActive: boolean;
+  /** v1.6 gearbox readout: gear (-1 = R) and rpm fraction of redline, 0..1 (quantised) */
+  gear: number;
+  rpmFrac: number;
   clock: string;
   navTarget: Landmark | null;
   waypointDist: number;
@@ -143,6 +146,7 @@ interface HudState {
   setHint: (h: string | null) => void;
   showMsg: (text: string) => void;
   setNitro: (fuel: number, active: boolean) => void;
+  setEngine: (gear: number, rpmFrac: number) => void;
   setClock: (c: string) => void;
   setWaypoint: (dist: number, deg: number) => void;
   setNavTarget: (l: Landmark) => void;
@@ -177,6 +181,8 @@ export const useHudStore = create<HudState>((set, get) => ({
   msg: null,
   nitroFuel: 1,
   nitroActive: false,
+  gear: 1,
+  rpmFrac: 0,
   clock: "06:00",
   navTarget: LANDMARKS[0], // VENU, matches the original's default navTarget
   waypointDist: 0,
@@ -219,6 +225,10 @@ export const useHudStore = create<HudState>((set, get) => ({
   setNitro: throttled(
     (fuel: number, active: boolean) => { const s = get(); if (Math.abs(s.nitroFuel - fuel) > 0.004 || s.nitroActive !== active) set({ nitroFuel: fuel, nitroActive: active }); },
     (_f: number, active: boolean) => get().nitroActive !== active,
+  ),
+  setEngine: throttled(
+    (gear: number, rpmFrac: number) => { const q = Math.round(rpmFrac * 20) / 20; const s = get(); if (s.gear !== gear || s.rpmFrac !== q) set({ gear, rpmFrac: q }); },
+    (gear: number) => get().gear !== gear,
   ),
   setClock: (c) => set({ clock: c }),
   setWaypoint: throttled((dist: number, deg: number) => set({ waypointDist: dist, waypointDeg: deg })),
