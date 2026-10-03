@@ -84,6 +84,7 @@ import { LIVERIES } from "@/components/Airliner";
 import { Props } from "@/components/Props";
 import { TashkentLandmarks } from "@/components/TashkentLandmarks";
 import { Skyline } from "@/components/Skyline";
+import { Clouds } from "@/components/Clouds";
 import { Headlights } from "@/components/Headlights";
 import { MouseLook } from "@/components/MouseLook";
 import { Highway } from "@/components/Highway";
@@ -337,6 +338,7 @@ export default function Game() {
           <DprSync />
           <SkyCycle />
           <Skyline />
+          <Clouds />
           <FogFarSync />
           <LightPool count={prof.pointLights} />
           {/* image lighting: HDR on HIGH (own Suspense so the 1.4 MB file never

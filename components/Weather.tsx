@@ -7,7 +7,8 @@ import { useFrame } from "@/lib/safeFrame";
 import * as THREE from "three";
 import { useHudStore } from "@/lib/hudStore";
 import { worldState } from "@/lib/worldState";
-import { weatherState, pickWeather } from "@/lib/weatherState";
+import { weatherState, pickWeather, WIND_FOR } from "@/lib/weatherState";
+import { skyState } from "@/lib/skyState";
 import { coatScene, weatherCoatUniforms } from "@/lib/weatherCoat";
 import { requestPlayerTeleport } from "@/lib/playerTeleport";
 import { vehicleState } from "@/lib/vehicleState";
@@ -39,7 +40,7 @@ rg.fillStyle = grad;
 rg.fillRect(0, 0, 8, 64);
 const rainTex = new THREE.CanvasTexture(rainCanvas);
 
-const RAIN_N = 500;
+const RAIN_N = 1400; // v2.0: denser (was 500 over a 110 m box — read as drizzle)
 const rainY = new Float32Array(RAIN_N);
 // same imperative BufferGeometry-at-module-scope idiom as MizuRestaurant.tsx's
 // GABLE_ROOF_GEO — plugged into <points geometry={...}> below rather than JSX
@@ -47,9 +48,9 @@ const rainY = new Float32Array(RAIN_N);
 const rainGeo = (() => {
   const pos = new Float32Array(RAIN_N * 3);
   for (let i = 0; i < RAIN_N; i++) {
-    pos[i * 3] = (Math.random() * 2 - 1) * 55;
+    pos[i * 3] = (Math.random() * 2 - 1) * 40;
     pos[i * 3 + 1] = rainY[i] = Math.random() * 40;
-    pos[i * 3 + 2] = (Math.random() * 2 - 1) * 55;
+    pos[i * 3 + 2] = (Math.random() * 2 - 1) * 40;
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
@@ -93,6 +94,7 @@ const snowGeo = (() => {
 
 const cGrey = new THREE.Color(0x8a94a0);
 const cWarm = new THREE.Color(0xfff0c8);
+const cFlash = new THREE.Color(0xdfe6ff);
 const tmpColor = new THREE.Color();
 
 // Same fixed direction as SkyCycle.tsx's sunRef position ([60,80,30],
@@ -183,7 +185,7 @@ export function Weather() {
 
     const greyK = isFog ? 0.55 : isSnow ? 0.45 : isRain ? 0.4 : isOver ? 0.3 : 0;
     if (greyK > 0) {
-      tmpColor.copy(fog.color).lerp(cGrey, greyK * 0.5);
+      tmpColor.copy(fog.color).lerp(cGrey, Math.min(0.85, greyK * 1.3)); // v2.0: properly grey skies (was greyK*0.5 — still read blue)
       fog.color.copy(tmpColor);
       if (scene.background instanceof THREE.Color) scene.background.copy(tmpColor);
       // hemi dimming matches the original's `hemi.intensity*=1-greyK*0.35`,
@@ -216,16 +218,43 @@ export function Weather() {
       }
     }
 
-    const rainTarget = isRain ? 0.55 : 0;
+    // v2.0 wind: slow veer of direction + gusts around the weather's mean
+    const W = weatherState.wind;
+    const tw = clockRef.current;
+    W.dir += (Math.sin(tw * 0.031) * 0.002 + Math.sin(tw * 0.0071) * 0.001) * 60 * dt;
+    const gust = 1 + 0.35 * Math.sin(tw * 0.9) * Math.sin(tw * 0.37 + 1.3);
+    W.speed += (WIND_FOR[weatherState.kind] * gust - W.speed) * Math.min(1, dt * 0.4);
+    W.x = Math.cos(W.dir) * W.speed;
+    W.z = Math.sin(W.dir) * W.speed;
+
+    // lightning: random double-flash in rain, lifts the hemisphere light
+    if (isRain && Math.random() < dt / 9) weatherState.flash = 1;
+    if (weatherState.flash > 0) {
+      const f = weatherState.flash;
+      const hemi = scene.getObjectByProperty("type", "HemisphereLight") as THREE.HemisphereLight | undefined;
+      const strobe = f > 0.7 || (f > 0.35 && f < 0.5) ? 1 : 0.25;
+      if (hemi) hemi.intensity += f * strobe * (1.2 + skyState.nightK * 2.5);
+      if (scene.background instanceof THREE.Color) scene.background.lerp(cFlash, f * strobe * 0.5);
+      weatherState.flash = Math.max(0, f - dt * 2.2);
+    }
+
+    const rainTarget = isRain ? 0.75 : 0;
     mat.opacity = THREE.MathUtils.lerp(mat.opacity, rainTarget, Math.min(1, dt * 3));
     pts.visible = mat.opacity > 0.01; // an invisible Points still costs a draw call
     if (mat.opacity > 0.01) {
       pts.position.set(worldState.px, 0, worldState.pz);
       const posAttr = pts.geometry.attributes.position as THREE.BufferAttribute;
+      // wind slant: drops drift sideways while they fall (wrapped in the 80 m box)
+      const sx = W.x * dt * 0.9, sz = W.z * dt * 0.9;
       for (let i = 0; i < RAIN_N; i++) {
         rainY[i] -= dt * 48;
         if (rainY[i] < 0) rainY[i] += 40;
         posAttr.setY(i, rainY[i]);
+        let x = posAttr.getX(i) + sx, z = posAttr.getZ(i) + sz;
+        if (x > 40) x -= 80; else if (x < -40) x += 80;
+        if (z > 40) z -= 80; else if (z < -40) z += 80;
+        posAttr.setX(i, x);
+        posAttr.setZ(i, z);
       }
       posAttr.needsUpdate = true;
     }
@@ -244,6 +273,10 @@ export function Weather() {
         for (let i = 0; i < SNOW_N; i++) {
           snowY[i] -= dt * 10; // slower fall + sway vs rain's straight-down streak
           if (snowY[i] < 0) snowY[i] += 40;
+          snowBaseX[i] += W.x * dt * 0.6;
+          snowBaseZ[i] += W.z * dt * 0.6;
+          if (snowBaseX[i] > 55) snowBaseX[i] -= 110; else if (snowBaseX[i] < -55) snowBaseX[i] += 110;
+          if (snowBaseZ[i] > 55) snowBaseZ[i] -= 110; else if (snowBaseZ[i] < -55) snowBaseZ[i] += 110;
           posAttr.setX(i, snowBaseX[i] + Math.sin(t * 0.6 + snowPhase[i]) * 1.5);
           posAttr.setY(i, snowY[i]);
           posAttr.setZ(i, snowBaseZ[i] + Math.cos(t * 0.5 + snowPhase[i]) * 1.5);

@@ -15,6 +15,8 @@ import { worldState } from "@/lib/worldState";
 import { signalFor, signalTime } from "@/lib/trafficSignals";
 import { useMissions, type MissionKind } from "@/lib/missions";
 import { useCareer } from "@/lib/career";
+import { weatherState } from "@/lib/weatherState";
+import { skyState } from "@/lib/skyState";
 
 if (typeof window !== "undefined") {
   (window as unknown as { __td: unknown }).__td = {
@@ -36,6 +38,9 @@ if (typeof window !== "undefined") {
     giveMoney: (n: number) => useCareer.getState().addMoney(n),
     buyUpgrade: (car: string, k: "power" | "grip" | "brakes" | "weight") => useCareer.getState().buy(car, k),
     enter: (k: string) => { useHudStore.getState().setActive(k as never); useHudStore.getState().setCamMode(0); },
+    weather: (k?: string) => { if (k) { weatherState.kind = k as never; weatherState.timer = 9999; } return { kind: weatherState.kind, wind: { ...weatherState.wind }, flash: weatherState.flash, hour: skyState.hour, nightK: skyState.nightK }; },
+    // phase: sine phase of the day cycle (0.9 ~ 09:30, 3.9 ~ dusk/night, 4.7 ~ midnight)
+    skyPhase: (p: number) => { skyState.jumpTo = p; },
     signal: () => { const t = signalTime(); return { t, x: signalFor("x", t), z: signalFor("z", t) }; },
     look: (yaw: number, pitch = 0) => { cameraLook.targetYaw = cameraLook.yaw = yaw; cameraLook.targetPitch = cameraLook.pitch = pitch; },
   };

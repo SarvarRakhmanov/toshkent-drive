@@ -64,13 +64,18 @@ export function Skyline() {
     // size is unchanged and it still lies beyond the fog end.
     const far = (camera as THREE.PerspectiveCamera).far || 400;
     m.scale.setScalar(Math.min(1, (far * 0.9) / 400));
-    const f = scene.fog as THREE.Fog | null;
-    if (f) mat.uniforms.uFog.value.copy(f.color);
+    // fog colour is copied in onBeforeRender (below): Weather.tsx greys
+    // scene.fog AFTER this frame callback, so copying here hazed the ridge
+    // to the un-weathered blue (bright blue mountains in fog/rain)
     const night = skyState.nightK;
     mat.uniforms.uDay.value = 1 - night * 0.85;
     mat.uniforms.uNight.value = night;
     // thicker haze in fog / rain (lib/weatherState.ts)
-    mat.uniforms.uHaze.value = 0.32 + (1 - weatherState.wetGrip) * 0.9 + (weatherState.kind === "fog" ? 0.6 : 0);
+    mat.uniforms.uHaze.value = 0.32 + (1 - weatherState.wetGrip) * 0.9 + (weatherState.kind === "fog" ? 0.9 : 0);
   });
-  return <mesh ref={ref} geometry={geo} material={mat} frustumCulled={false} renderOrder={-1} name="td-skyline" />;
+  const onBeforeRender = () => {
+    const f = scene.fog as THREE.Fog | null;
+    if (f) mat.uniforms.uFog.value.copy(f.color);
+  };
+  return <mesh ref={ref} geometry={geo} material={mat} frustumCulled={false} renderOrder={-1} name="td-skyline" onBeforeRender={onBeforeRender} />;
 }

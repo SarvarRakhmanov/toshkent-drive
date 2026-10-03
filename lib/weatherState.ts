@@ -15,7 +15,15 @@ export const weatherState = {
   // as the original's `weatherTimer=25+Math.random()*35` vs the reset below
   timer: 25 + Math.random() * 35,
   wetGrip: 1,
+  // v2.0 wind (m/s, world x/z), eased toward a per-weather strength with
+  // gusts by components/Weather.tsx; drives cloud drift, rain/snow slant
+  wind: { x: 1.5, z: 0.8, speed: 1.7, dir: 0.5 },
+  /** 0..1 lightning flash level (rain at night/dusk mostly) */
+  flash: 0,
 };
+
+/** mean wind speed per weather (m/s) */
+export const WIND_FOR: Record<Weather, number> = { clear: 2.5, sunny: 1.5, overcast: 5, rain: 8.5, fog: 0.8, snow: 4 };
 
 export function pickWeather(): Weather {
   const r = Math.random();

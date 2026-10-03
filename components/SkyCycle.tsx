@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { Sky } from "@react-three/drei";
 import { useHudStore } from "@/lib/hudStore";
 import { skyState } from "@/lib/skyState";
+import { weatherState } from "@/lib/weatherState";
 import { loadSave } from "@/lib/saveGame";
 import { worldState } from "@/lib/worldState";
 import { currentProfile } from "@/lib/gfx";
@@ -26,6 +27,8 @@ const DAY = new THREE.Color(0x7ec4f2);
 const NIGHT = new THREE.Color(0x05070f);
 const SUN_NIGHT = new THREE.Color(0x7d8fc8); // original's moonlight tint
 const SUN_DAY = new THREE.Color().setHSL(0.1, 0.5, 0.75); // original's warm daylight tint
+
+const skyGrey = { k: 0 };
 
 export function SkyCycle() {
   const { scene, gl } = useThree();
@@ -49,6 +52,8 @@ export function SkyCycle() {
   // eslint-disable-next-line react-hooks/immutability
   useFrame((_, dt) => {
     t.current += dt * 0.015; // one full cycle every ~7 minutes
+    // test hook / phone menu: jump the clock to a sine phase
+    if (!Number.isNaN(skyState.jumpTo)) { t.current = skyState.jumpTo; skyState.jumpTo = NaN; }
     skyState.phase = t.current;
     const dayK = (Math.sin(t.current) + 1) / 2;
     const nightK = 1 - dayK;
@@ -88,7 +93,14 @@ export function SkyCycle() {
       const mat = skyRef.current.material as THREE.ShaderMaterial;
       mat.uniforms.sunPosition.value.set(Math.cos(t.current), Math.sin(t.current) * 0.9 + 0.02, 0.35);
       // LOW: no per-pixel atmospheric sky shader — the fog-coloured background reads the same at phone size
-      skyRef.current.visible = prof.quality === "high" && dayK > 0.12;
+      // v2.0: overcast/rain/fog/snow wash the blue out of the physical sky
+      // (higher turbidity, less Rayleigh) and hand over to the weather-tinted
+      // background colour (components/Weather.tsx) once it is fully grey
+      const grey = weatherState.kind === "clear" || weatherState.kind === "sunny" ? 0 : 1;
+      skyGrey.k += (grey - skyGrey.k) * Math.min(1, dt * 0.25);
+      mat.uniforms.turbidity.value = 1.8 + skyGrey.k * 16;
+      mat.uniforms.rayleigh.value = 0.9 * (1 - skyGrey.k * 0.85);
+      skyRef.current.visible = prof.quality === "high" && dayK > 0.12 && skyGrey.k < 0.85;
     }
     if (hemiRef.current) hemiRef.current.intensity = 0.18 + dayK * 0.5;
     // brightest at night to compensate for the dark night palette. Base
