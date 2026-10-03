@@ -20,6 +20,7 @@ import { pedestrianPositions } from "@/components/Pedestrians";
 import { spawnDebris } from "@/lib/debris";
 import { groundYAt } from "@/lib/marina";
 import { BASE_X, BASE_Z, FENCE_X, FENCE_Z } from "@/lib/militaryBase";
+import { nextIntersection, signalFor, STOP_LINE } from "@/lib/trafficSignals";
 
 // Basic traffic AI (Phase 3, part of Milestone 4): a handful of self-driving
 // cars patrolling straight lanes. Deliberately not the original's full
@@ -226,7 +227,10 @@ const LANE_OFFSET = 3; // sideways shift off the road centreline (road is 20 wid
 // that actually prevents the clip-through, physics collider or not.
 const obstacles: { x: number; z: number }[] = [];
 const footPos = { x: 0, z: 0 }; // scratch, so the on-foot check allocates nothing per frame
-function laneBlocked(lane: Lane, nextPos: number, dir: number): boolean {
+// 0 = clear, 1 = a real obstacle (player vehicle / pedestrian / player on
+// foot — fires the debris burst), 2 = queueing behind another lane car
+// (v1.8 AI yielding: no debris, just wait).
+function laneBlocked(lane: Lane, nextPos: number, dir: number, self: number, ignoreTraffic: boolean): 0 | 1 | 2 {
   obstacles.length = 0; // reused across frames/cars — never reallocated
   obstacles.push(
     vehicleState.car,
@@ -249,9 +253,42 @@ function laneBlocked(lane: Lane, nextPos: number, dir: number): boolean {
     const across = lane.axis === "x" ? v.z : v.x;
     if (Math.abs(across - lane.lane) > LANE_HALF_WIDTH) continue; // not in this lane
     const gap = along - nextPos; // signed distance from where we're about to be
-    if (gap * dir > 0 && Math.abs(gap) < stopDistance) return true; // only stop for what's ahead, not what's already behind
+    if (gap * dir > 0 && Math.abs(gap) < stopDistance) return 1; // only stop for what's ahead, not what's already behind
   }
-  return false;
+  if (ignoreTraffic) return 0;
+  // other lane cars: only those in OUR half of the road (same-direction queue,
+  // or a cross-street car still inside the junction box ahead of us) —
+  // oncoming cars sit on the other side of the centreline and never block
+  const myCross = lane.lane + (dir > 0 ? LANE_OFFSET : -LANE_OFFSET);
+  const gapNeed = stopDistance + 1.5;
+  for (let i = 0; i < trafficPositions.length; i++) {
+    if (i === self) continue;
+    const o = trafficPositions[i];
+    if (o.stolen) continue;
+    const along = lane.axis === "x" ? o.x : o.z;
+    const across = lane.axis === "x" ? o.z : o.x;
+    if (Math.abs(across - myCross) > 2.2) continue;
+    const gap = along - nextPos;
+    if (gap * dir > 0 && Math.abs(gap) < gapNeed) return 2;
+  }
+  return 0;
+}
+
+// v1.8 traffic lights (lib/trafficSignals.ts): target-speed factor for the
+// approach to the next junction — 1 = cruise, 0 = hold at the stop line.
+// Police / security-jeep patrol lanes run through on blue lights.
+function signalFactor(lane: Lane, pos: number, dir: number): number {
+  if (lane.police || lane.policeJeep) return 1;
+  const c = nextIntersection(pos, dir);
+  if (c < lane.min + 4 || c > lane.max - 4) return 1;
+  const stop = STOP_LINE + (lane.kind === "bus" ? 1.4 : lane.kind === "truck" ? 1 : 0);
+  const toLine = (c - pos) * dir - stop;
+  if (toLine < -0.6) return 1; // front already over the line — clear the junction
+  const sig = signalFor(lane.axis);
+  if (sig === 2) return 1;
+  if (sig === 1 && toLine < 4) return 1; // too close to stop for amber: go
+  if (toLine <= 0.05) return 0;
+  return Math.min(1, Math.max(0.12, toLine / 14));
 }
 
 // [width, height, length] per body, eyeballed off CommercialBody.tsx's actual
@@ -276,6 +313,9 @@ function TrafficCar({ lane, seed, index }: { lane: Lane; seed: number; index: nu
   const lightRefs = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
   const meshRef = useRef<THREE.Group>(null);
   const wasBlocked = useRef(false); // rising-edge latch for the debris burst below
+  const vel = useRef(lane.speed); // v1.8: eased speed (signal braking / pull-away)
+  const queued = useRef(0); // seconds spent queued behind another lane car
+  const ghost = useRef(0); // deadlock breaker: ignore other lane cars briefly
   const [drawDist2] = useState(() => currentProfile().npcDrawDist ** 2);
 
   useFrame((state, dt) => {
@@ -316,15 +356,28 @@ function TrafficCar({ lane, seed, index }: { lane: Lane; seed: number; index: nu
     // resolves kinematic-vs-kinematic overlap even with the real collider
     // added below, so without this check they'd drive straight through a
     // parked car instead of stopping short of it.
-    const nextPos = pos.current + lane.speed * dir.current * d;
-    const blocked = laneBlocked(lane, nextPos, dir.current);
+    // v1.8: ease toward the signal-limited cruise speed (brake for red
+    // lights, pull away on green) instead of a constant lane.speed
+    const target = lane.speed * signalFactor(lane, pos.current, dir.current);
+    const dv = target - vel.current;
+    vel.current += Math.max(-7 * d, Math.min(3.5 * d, dv));
+    if (target === 0 && vel.current < 0.6) vel.current = 0;
+    const nextPos = pos.current + vel.current * dir.current * d;
+    ghost.current = Math.max(0, ghost.current - d);
+    const blockKind = laneBlocked(lane, nextPos, dir.current, index, ghost.current > 0);
+    if (blockKind === 2) {
+      queued.current += d;
+      if (queued.current > 6) { ghost.current = 2; queued.current = 0; } // two cars nose-to-nose in a junction: let one creep through
+    } else queued.current = 0;
+    const blocked = blockKind !== 0 || vel.current === 0;
+    if (blockKind !== 0) vel.current = Math.min(vel.current, 1.5);
     // collision effect: fire once on the frame this car first has to brake
     // for something (a real vehicle or a pedestrian — see laneBlocked's own
     // comment) rather than every frame it sits there, and only while it was
     // actually making progress (lane.speed>0) so a lane's own min/max
     // endpoints — which reverse direction through a separate branch below,
     // not through laneBlocked — never trigger it.
-    if (blocked && !wasBlocked.current && lane.speed > 3) {
+    if (blockKind === 1 && !wasBlocked.current && lane.speed > 3) {
       spawnDebris({
         x: slot.x,
         y: RIDE_HEIGHT + 0.3,
@@ -334,7 +387,7 @@ function TrafficCar({ lane, seed, index }: { lane: Lane; seed: number; index: nu
         power: Math.max(0.3, Math.min(1, lane.speed / 15)),
       });
     }
-    wasBlocked.current = blocked;
+    wasBlocked.current = blockKind === 1;
     if (!blocked) {
       pos.current = nextPos;
       if (pos.current > lane.max) {

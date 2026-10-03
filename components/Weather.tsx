@@ -218,6 +218,7 @@ export function Weather() {
 
     const rainTarget = isRain ? 0.55 : 0;
     mat.opacity = THREE.MathUtils.lerp(mat.opacity, rainTarget, Math.min(1, dt * 3));
+    pts.visible = mat.opacity > 0.01; // an invisible Points still costs a draw call
     if (mat.opacity > 0.01) {
       pts.position.set(worldState.px, 0, worldState.pz);
       const posAttr = pts.geometry.attributes.position as THREE.BufferAttribute;
@@ -236,6 +237,7 @@ export function Weather() {
       const t = clockRef.current;
       const snowTarget = isSnow ? 0.6 : 0;
       snowMat.opacity = THREE.MathUtils.lerp(snowMat.opacity, snowTarget, Math.min(1, dt * 3));
+      snowPts.visible = snowMat.opacity > 0.01;
       if (snowMat.opacity > 0.01) {
         snowPts.position.set(worldState.px, 0, worldState.pz);
         const posAttr = snowPts.geometry.attributes.position as THREE.BufferAttribute;

@@ -13,7 +13,7 @@ const last = { calls: 0, triangles: 0, points: 0, lines: 0, frames: 0 };
 export const renderedFrames = () => last.frames;
 
 export function PerfProbe() {
-  const { gl, scene } = useThree();
+  const { gl, scene, camera } = useThree();
   useEffect(() => {
     gl.info.autoReset = false;
     // world-space bounds of a named object (tests: wheels-on-ground check)
@@ -39,6 +39,30 @@ export function PerfProbe() {
         out.push({ name: m.name, skinned: !!(m as THREE.SkinnedMesh).isSkinnedMesh, minY: +b.min.y.toFixed(3), visible: m.visible, mat: ((Array.isArray(m.material) ? m.material[0] : m.material) as THREE.Material).name });
       });
       return out.sort((a, b) => a.minY - b.minY).slice(0, 6);
+    };
+    // perf diagnostics: visible, in-frustum draw objects grouped by their
+    // top-level named ancestor (approximate draw-call census)
+    (window as unknown as { __tdDraw: (top?: boolean) => unknown }).__tdDraw = (top?: boolean) => {
+      const cam = camera;
+      const fr = new THREE.Frustum();
+      if (cam) fr.setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+      const out: Record<string, number> = {};
+      scene.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!(m.isMesh || (o as THREE.Points).isPoints)) return;
+        for (let p: THREE.Object3D | null = o; p; p = p.parent) if (!p.visible) return;
+        if ((o as THREE.InstancedMesh).isInstancedMesh && (o as THREE.InstancedMesh).count === 0) return;
+        if (cam && m.frustumCulled && m.geometry) {
+          if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+          const sph = m.geometry.boundingSphere!.clone().applyMatrix4(m.matrixWorld);
+          if (!fr.intersectsSphere(sph)) return;
+        }
+        let topNamed = "", near = o.name;
+        for (let p: THREE.Object3D | null = o.parent; p && p !== scene; p = p.parent) { if (p.name) { topNamed = p.name; if (!near) near = p.name; } }
+        const k = top ? topNamed || near || o.type : `${topNamed || "-"}/${near || o.type}`;
+        out[k] = (out[k] ?? 0) + (Array.isArray(m.material) ? m.material.length : 1);
+      });
+      return Object.entries(out).sort((a, b) => b[1] - a[1]).slice(0, 40);
     };
     (window as unknown as { __tdPrograms: () => unknown }).__tdPrograms = () =>
       (gl.info.programs ?? []).map((p) => ({ id: p.id, name: p.name, key: (p as unknown as { cacheKey: string }).cacheKey }));
@@ -75,7 +99,7 @@ export function PerfProbe() {
           : null,
       };
     };
-  }, [gl, scene]);
+  }, [gl, scene, camera]);
   useFrame(() => {
     const r = gl.info.render;
     last.calls = r.calls; last.triangles = r.triangles; last.points = r.points; last.lines = r.lines;

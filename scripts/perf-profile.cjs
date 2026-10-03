@@ -68,6 +68,7 @@ const log = (...a) => console.log(`[perf-${TAG}]`, ...a);
   const gcHeap = async () => { await page.evaluate(() => window.gc && window.gc()); await page.waitForTimeout(300); return (await page.evaluate(() => window.__tdPerf())).heapMB; };
   const idle = await sample();
   log("idle:", JSON.stringify(idle));
+  if (process.env.DIAG) log("draw census (idle):", JSON.stringify(await page.evaluate(() => window.__tdDraw && window.__tdDraw(true))));
   log("pedestrian robots drawn (idle):", JSON.stringify(await page.evaluate(() => window.__td && window.__td.pedStats ? window.__td.pedStats() : null)));
   const heap0 = await gcHeap();
   await page.screenshot({ path: `${OUT}/perf-${TAG}-idle.png` });
@@ -83,7 +84,7 @@ const log = (...a) => console.log(`[perf-${TAG}]`, ...a);
     if (k) await page.keyboard.down(k);
     await page.waitForTimeout(k ? 1500 : 5000);
     if (k) { await page.keyboard.up(k); await page.waitForTimeout(3500); }
-    if (s === 5) { drv = await sample(); await page.screenshot({ path: `${OUT}/perf-${TAG}-driving.png` }); }
+    if (s === 5) { drv = await sample(); await page.screenshot({ path: `${OUT}/perf-${TAG}-driving.png` }); if (process.env.DIAG) log("draw census (driving):", JSON.stringify(await page.evaluate(() => window.__tdDraw && window.__tdDraw(true)))); }
     if ((s / 5) % 6 === 5) await page.keyboard.press("KeyR"); // reset every 30 s so we keep moving
     if (s % 30 === 0) heaps.push(await gcHeap());
   }

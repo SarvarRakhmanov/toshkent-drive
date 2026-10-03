@@ -12,6 +12,7 @@ import { cameraLook } from "@/lib/cameraLook";
 import { pedestrianPositions, pedDrawStats } from "@/components/Pedestrians";
 import { requestPlayerTeleport } from "@/lib/playerTeleport";
 import { worldState } from "@/lib/worldState";
+import { signalFor, signalTime } from "@/lib/trafficSignals";
 
 if (typeof window !== "undefined") {
   (window as unknown as { __td: unknown }).__td = {
@@ -27,6 +28,7 @@ if (typeof window !== "undefined") {
     player: () => ({ x: worldState.px, y: worldState.py, z: worldState.pz, h: worldState.heading }),
     // on-foot only: drop the player at x,z facing h (screenshots of the robots)
     tp: (x: number, z: number, h = 0) => requestPlayerTeleport(x, z, h),
+    signal: () => { const t = signalTime(); return { t, x: signalFor("x", t), z: signalFor("z", t) }; },
     look: (yaw: number, pitch = 0) => { cameraLook.targetYaw = cameraLook.yaw = yaw; cameraLook.targetPitch = cameraLook.pitch = pitch; },
   };
 }

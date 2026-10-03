@@ -10,6 +10,7 @@ import { NPC_ROBOTS, useNpcRobots } from "@/components/RobotModels";
 import { useGfxStore } from "@/lib/gfx";
 import { AIRPORT_CHUNKS } from "@/components/City";
 import { requestPedestrianHitSlowdown } from "@/lib/pedestrianHit";
+import { redLeft } from "@/lib/trafficSignals";
 
 // Real port of the original's pedestrian system (index.html ~line 6148-6182,
 // 7591-7632): 44 civilians + 7 cops, each walking a 72m square loop around a
@@ -32,7 +33,8 @@ const LOOP_LEN = SIDE * 4; // 288, matches the original's literal `per`
 // a ~1.6-2.8k LOD out to FAR_DIST, nothing beyond (they're specks by then).
 // (LOW graphics: 20 m / 90 m.) Robots behind the camera are skipped too — the
 // instanced meshes can't be frustum-culled as a whole.
-const LOD_DIST = { high: [32, 150], low: [20, 90] } as const;
+// v1.8: LOW pulled in (crossing robots now come right up to the car on the road)
+const LOD_DIST = { high: [32, 150], low: [10, 75] } as const;
 const OFFICER_ROBOT = NPC_ROBOTS.findIndex((r) => r.id === "checkered-guard");
 const CIVILIAN_ROBOTS = NPC_ROBOTS.map((_, i) => i).filter((i) => i !== OFFICER_ROBOT);
 
@@ -151,6 +153,74 @@ interface PedState {
   rag: Ragdoll | null;
   bob: number;
   sway: number;
+  side: number; // loop side index last frame (corner detection)
+  cross: Crossing | null;
+}
+
+// v1.8 crosswalks: at a block corner a civilian may cross the street straight
+// ahead to the next block, on the painted zebra (City.tsx: 11–13.4 m from the
+// junction centre, i.e. ~1.8 m inside the sidewalk line), waiting at the curb
+// until the cars on that road have enough red left (lib/trafficSignals.ts).
+interface Crossing {
+  x0: number; z0: number; x1: number; z1: number;
+  ox: number; oz: number; // lateral shift onto the zebra
+  axis: "x" | "z"; // traffic axis of the road being crossed
+  u: number; // metres walked
+  wait: number;
+  ncx: number; ncz: number; ns: number; // block + loop position on arrival
+}
+const CROSS_LEN = 28; // sidewalk line to sidewalk line (road 20 + 2×4 m)
+const CROSS_SPEED = 2.4;
+const CROSS_CHANCE = 0.45;
+const CORNER_S: Record<string, number> = { "-1,-1": 0, "1,-1": SIDE, "1,1": SIDE * 2, "-1,1": SIDE * 3 };
+
+function maybeStartCrossing(ps: PedState, x: number, z: number, fx: number, fz: number): void {
+  // fx/fz: walking direction just before the corner
+  if (Math.random() > CROSS_CHANCE) return;
+  const ncx = ps.cx + fx * CELL, ncz = ps.cz + fz * CELL;
+  if (ncx + CELL / 2 >= SHORE_X - 40 || AIRPORT_CHUNKS.has(`${Math.round(ncx / CELL)},${Math.round(ncz / CELL)}`)) return;
+  const sx = Math.sign(x - ps.cx), sz = Math.sign(z - ps.cz);
+  const x1 = x + fx * CROSS_LEN, z1 = z + fz * CROSS_LEN;
+  const ax = Math.sign(x1 - ncx), az = Math.sign(z1 - ncz);
+  const ns = CORNER_S[`${ax},${az}`];
+  if (ns === undefined) return;
+  ps.cross = {
+    x0: x, z0: z, x1, z1,
+    // shift toward the junction (the corner's own outward side, perpendicular to travel)
+    ox: fx !== 0 ? 0 : sx * 1.8, oz: fx !== 0 ? sz * 1.8 : 0,
+    axis: fx !== 0 ? "z" : "x", // walking along x crosses a road that runs along z
+    u: 0, wait: 0, ncx, ncz, ns,
+  };
+}
+
+/** Returns true while the crossing owns the pedestrian's position. */
+function stepCrossing(g: THREE.Object3D, ps: PedState, d: number, run: boolean): boolean {
+  const c = ps.cross!;
+  if (c.u === 0) {
+    // waiting at the kerb for enough red on the road we cross
+    const need = CROSS_LEN / CROSS_SPEED + 0.8;
+    if (!run && redLeft(c.axis) < need) {
+      c.wait += d;
+      if (c.wait > 40) ps.cross = null; // give up, keep walking the block
+      g.position.set(c.x0, 0, c.z0);
+      return ps.cross !== null;
+    }
+  }
+  c.u = Math.min(CROSS_LEN, c.u + CROSS_SPEED * (run ? 2.2 : 1) * d);
+  const k = c.u / CROSS_LEN;
+  const ramp = Math.min(1, c.u / 3, (CROSS_LEN - c.u) / 3);
+  const x = c.x0 + (c.x1 - c.x0) * k + c.ox * ramp;
+  const z = c.z0 + (c.z1 - c.z0) * k + c.oz * ramp;
+  g.position.set(x, 0, z);
+  g.rotation.y = Math.atan2(c.x1 - c.x0, c.z1 - c.z0);
+  if (c.u >= CROSS_LEN) {
+    ps.cx = c.ncx;
+    ps.cz = c.ncz;
+    ps.s = c.ns;
+    ps.side = Math.floor((((ps.s % LOOP_LEN) + LOOP_LEN) % LOOP_LEN) / SIDE);
+    ps.cross = null;
+  }
+  return true;
 }
 
 // Same per-pedestrian logic as before the robot swap (walk loop, flee,
@@ -199,6 +269,8 @@ function stepPed(g: THREE.Object3D, spec: PedSpec, ps: PedState, index: number, 
         ps.cz = Math.round(g.position.z / CELL) * CELL;
         ps.s = Math.random() * LOOP_LEN;
         ps.flee = 0;
+        ps.side = -1;
+        ps.cross = null;
       }
       return;
     }
@@ -240,6 +312,7 @@ function stepPed(g: THREE.Object3D, spec: PedSpec, ps: PedState, index: number, 
           // in the same beat the ragdoll fires — the collision costs the
           // driver something too, not just the pedestrian (lib/pedestrianHit.ts)
           requestPedestrianHitSlowdown();
+          ps.cross = null;
           return;
         }
       }
@@ -260,15 +333,41 @@ function stepPed(g: THREE.Object3D, spec: PedSpec, ps: PedState, index: number, 
       ps.cx = newCi * CELL;
       ps.cz = newCj * CELL;
       ps.s = Math.random() * LOOP_LEN;
+      ps.cross = null;
+      ps.side = -1;
     }
 
     const nearFast = speedMs > FLEE_SPEED_MS && fdx * fdx + fdz * fdz < FLEE_RADIUS2;
     if (nearFast) ps.flee = 1.4;
     ps.flee = Math.max(0, ps.flee - d);
 
+    if (ps.cross && stepCrossing(g, ps, d, ps.flee > 0)) {
+      const walking = ps.cross === null || ps.cross.u > 0;
+      if (walking) {
+        const ph = t * 9 + g.position.x + g.position.z;
+        ps.bob = Math.abs(Math.sin(ph)) * 0.05;
+        ps.sway = Math.sin(ph) * 0.05;
+      }
+      return;
+    }
     const spd = spec.baseSpeed * (ps.flee > 0 ? 3.2 : 1);
+    const sPrev = ps.s;
     ps.s += ps.dir * spd * d;
     const [x, z, fx, fz] = pedPos(ps.cx, ps.cz, ps.s);
+    const side = Math.floor((((ps.s % LOOP_LEN) + LOOP_LEN) % LOOP_LEN) / SIDE);
+    if (!spec.officer && ps.side >= 0 && side !== ps.side && ps.flee <= 0) {
+      // just rounded a corner: snap to it and maybe cross straight on
+      const corner = ps.dir > 0 ? Math.ceil(sPrev / SIDE) * SIDE : Math.floor(sPrev / SIDE) * SIDE;
+      const [, , pfx, pfz] = pedPos(ps.cx, ps.cz, ps.dir > 0 ? corner - 0.01 : corner + 0.01);
+      const [cxp, czp] = pedPos(ps.cx, ps.cz, corner);
+      maybeStartCrossing(ps, cxp, czp, pfx * ps.dir, pfz * ps.dir);
+      if (ps.cross) {
+        ps.side = side;
+        g.position.set(cxp, 0, czp);
+        return;
+      }
+    }
+    ps.side = side;
     g.position.set(x, 0, z);
     g.rotation.y = Math.atan2(fx * ps.dir, fz * ps.dir);
 
@@ -286,7 +385,7 @@ function PedestrianRobots() {
   const robots = useNpcRobots();
   const holders = useMemo(() => PED_SPECS.map(() => new THREE.Object3D()), []);
   const states = useRef<PedState[]>(
-    PED_SPECS.map((spec) => ({ cx: spec.ci * CELL, cz: spec.cj * CELL, s: spec.s, dir: spec.dir, flee: 0, rag: null, bob: 0, sway: 0 }))
+    PED_SPECS.map((spec) => ({ cx: spec.ci * CELL, cz: spec.cj * CELL, s: spec.s, dir: spec.dir, flee: 0, rag: null, bob: 0, sway: 0, side: -1, cross: null }))
   );
   // one InstancedMesh per [robot type][lod][part], sized to that type's head count
   const { root, meshes } = useMemo(() => {
