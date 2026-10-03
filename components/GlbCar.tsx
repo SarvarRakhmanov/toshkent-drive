@@ -9,6 +9,7 @@ import { PLAYER_CARS, usePlayerCarStore, type PlayerCarDef } from "@/lib/playerC
 import { noTransmission } from "@/components/ReadyGate";
 import { coatScene } from "@/lib/weatherCoat";
 import { rigWheels, type WheelRig } from "@/lib/wheelRig";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 /** the active player car's wheel rig (posed by components/Car.tsx) */
 export const playerWheels: { rig: WheelRig | null } = { rig: null };
@@ -180,6 +181,81 @@ function addPlates(wrap: THREE.Object3D, plate: NonNullable<PlayerCarDef["plate"
   }
 }
 
+// ── merge the static body ────────────────────────────────────────────────────
+// A Sketchfab car is 50–70 separate meshes, each with its own (often
+// identical) material: the Seltos alone was 68 of phone LOW's 140-call budget.
+// Every non-moving mesh is baked into car-local space (de-quantised to float)
+// and merged per material *look* (type, colours, maps, PBR factors, blending).
+// Wheels (wheel-rig groups) and plates stay separate and keep animating.
+function matKey(m: THREE.Material): string {
+  const s = m as THREE.MeshPhysicalMaterial;
+  const id = (t: THREE.Texture | null | undefined) => (t ? t.uuid : "-");
+  return [m.type, s.color?.getHexString(), id(s.map), id(s.normalMap), id(s.roughnessMap), id(s.metalnessMap), id(s.aoMap), id(s.emissiveMap), id(s.alphaMap),
+    s.emissive?.getHexString(), s.metalness?.toFixed(2), s.roughness?.toFixed(2), s.clearcoat?.toFixed(2), s.envMapIntensity?.toFixed(2),
+    m.transparent, m.opacity.toFixed(2), m.side, m.alphaTest, m.depthWrite, m.blending, s.vertexColors].join("|");
+}
+
+function toFloatGeo(src: THREE.BufferGeometry, keep: string[]): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  for (const name of keep) {
+    const a = src.getAttribute(name);
+    const n = a.count, k = a.itemSize;
+    const out = new Float32Array(n * k);
+    for (let i = 0; i < n; i++) for (let j = 0; j < k; j++) out[i * k + j] = a.getComponent(i, j);
+    g.setAttribute(name, new THREE.BufferAttribute(out, k));
+  }
+  if (src.index) g.setIndex(Array.from(src.index.array as ArrayLike<number>));
+  return g;
+}
+
+function mergeStaticBody(obj: THREE.Object3D, rig: WheelRig | null) {
+  const moving = new Set<THREE.Object3D>();
+  rig?.wheels.forEach((w) => { moving.add(w.steer); moving.add(w.spin); });
+  obj.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(obj.matrixWorld).invert();
+  const groups = new Map<string, THREE.Mesh[]>();
+  obj.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || Array.isArray(m.material) || m.name === "td-plate" || !m.visible) return;
+    if ((m as THREE.SkinnedMesh).isSkinnedMesh || m.morphTargetInfluences || (m as THREE.InstancedMesh).isInstancedMesh) return;
+    for (let p = m.parent; p && p !== obj; p = p.parent) if (moving.has(p) || !p.visible) return;
+    const k = matKey(m.material);
+    const list = groups.get(k) ?? [];
+    list.push(m);
+    groups.set(k, list);
+  });
+  const mtx = new THREE.Matrix4();
+  for (const list of groups.values()) {
+    if (list.length < 2) continue;
+    const names = ["position", "normal", "uv"].filter((a) => list.every((m) => m.geometry.getAttribute(a)));
+    if (!names.includes("position")) continue;
+    const allIndexed = list.every((m) => m.geometry.index);
+    const geos = list.map((m) => {
+      let g = toFloatGeo(m.geometry, names);
+      if (!allIndexed && g.index) g = g.toNonIndexed();
+      mtx.multiplyMatrices(inv, m.matrixWorld);
+      g.applyMatrix4(mtx);
+      if (mtx.determinant() < 0) {
+        // mirrored node: flip winding so faces stay front-facing
+        if (g.index) { const ix = g.index.array as Uint32Array | number[]; for (let i = 0; i < ix.length; i += 3) { const t = ix[i + 1]; ix[i + 1] = ix[i + 2]; ix[i + 2] = t; } }
+        else for (const n of names) { const a = g.getAttribute(n) as THREE.BufferAttribute; const k = a.itemSize, arr = a.array as Float32Array; for (let i = 0; i < a.count; i += 3) for (let j = 0; j < k; j++) { const t = arr[(i + 1) * k + j]; arr[(i + 1) * k + j] = arr[(i + 2) * k + j]; arr[(i + 2) * k + j] = t; } }
+      }
+      return g;
+    });
+    const merged = mergeGeometries(geos, false);
+    geos.forEach((g) => g.dispose());
+    if (!merged) continue;
+    merged.computeBoundingSphere();
+    const mesh = new THREE.Mesh(merged, list[0].material);
+    mesh.name = `merged:${(list[0].material as THREE.Material).name || "mat"}`;
+    mesh.castShadow = list[0].castShadow;
+    mesh.receiveShadow = list[0].receiveShadow;
+    mesh.renderOrder = list[0].renderOrder;
+    list.forEach((m) => m.removeFromParent());
+    obj.add(mesh);
+  }
+}
+
 function preparePlayer(def: PlayerCarDef, scene: THREE.Object3D) {
   const obj = prepare(scene, def.rotY, def.length, def.paint, def.color, false, true);
   obj.name = `td-car:${def.id}`;
@@ -187,6 +263,7 @@ function preparePlayer(def: PlayerCarDef, scene: THREE.Object3D) {
   const rig = rigWheels(obj, def.phys?.wheelRadius ?? 0.32);
   if (def.plate) addPlates(obj, def.plate);
   obj.position.y -= RIDE_HEIGHT;
+  mergeStaticBody(obj, rig);
   obj.userData.wheelRig = rig;
   if (typeof window !== "undefined") {
     const w = window as unknown as { __tdWheels?: Record<string, unknown> };
