@@ -161,7 +161,7 @@ export const useHudStore = create<HudState>((set, get) => ({
   inClub: false,
   activeBuildingId: null,
   seatedAt: null,
-  controlsVisible: true,
+  controlsVisible: false, // collapsed behind the "?" button (H) — the full list covered half a phone screen
   stolenCar: null,
   hasGun: false,
   hasTicket: false,

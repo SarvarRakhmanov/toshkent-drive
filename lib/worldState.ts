@@ -37,3 +37,6 @@ if (typeof window !== "undefined") {
     // unreadable save — the (0,0) default is fine, that's where a new game starts
   }
 }
+
+// read-only peek for automated tests (scripts/mobile-test.cjs): position/heading of the active vehicle
+if (typeof window !== "undefined") (window as unknown as { __tdWorld: typeof worldState }).__tdWorld = worldState;

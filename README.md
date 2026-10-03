@@ -10,7 +10,14 @@ Built on the MIT-licensed **Neon City Drive** engine by ma67-ex
 ## Controls
 W A S D / arrows drive · Space handbrake · Shift nitro · **R** reset car onto road ·
 **K** change car · **Q** graphics high/low · C camera · L headlights · V weather · G map ·
-E enter/exit vehicle · B switch car/bike/boat · H hide help. Touch controls appear on phones.
+E enter/exit vehicle · B switch car/bike/boat · H (or the **?** button) shows this help.
+
+**Phones / tablets** (`components/TouchControls.tsx`, shown on touch devices only — force with
+`?touch=1` / `?touch=0`): analog steering pad bottom-left, GAS / BRAKE (reverse) bottom-right with
+small HB (handbrake) and N₂O above them, an **E** button when there is something to use, and a top
+row of icons: reset · change car · camera · HI/LO graphics · headlights · ⋯ (enter/exit, switch
+vehicle, map, phone, weather, sound, look sensitivity). Drag on the scene to look around.
+Phones start on LOW graphics. `scripts/mobile-test.cjs` is the Playwright iPhone-emulation test.
 
 ## Develop / build
 ```bash

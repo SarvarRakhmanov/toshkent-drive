@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { detectTouch } from "@/lib/touch";
 
 // Toshkent Drive: one switch between a "high" look (soft shadows, N8AO
 // ambient occlusion, bloom, SMAA, HDR image lighting) and a "low" one
@@ -10,8 +11,8 @@ function initial(): Quality {
   if (typeof window === "undefined") return "high";
   const saved = localStorage.getItem(KEY);
   if (saved === "high" || saved === "low") return saved;
-  const coarse = window.matchMedia?.("(pointer: coarse)").matches;
-  return coarse ? "low" : "high";
+  // phones/tablets start on LOW (no shadows/post-processing, reduced pixel ratio)
+  return detectTouch() ? "low" : "high";
 }
 
 interface GfxState {

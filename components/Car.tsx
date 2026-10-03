@@ -145,7 +145,9 @@ export function Car() {
     }
 
     const k = keys.current;
-    const steer = isActive ? (k.left ? 1 : 0) - (k.right ? 1 : 0) : 0;
+    // analog touch steering (components/TouchControls.tsx) when the thumb is on
+    // the pad, otherwise the plain digital left/right keys
+    const steer = isActive ? (k.steerAxis !== 0 ? k.steerAxis : (k.left ? 1 : 0) - (k.right ? 1 : 0)) : 0;
 
     // nitro: SHIFT+forward burns fuel for extra thrust and a raised top speed —
     // same constants as the original (10s tank, +150km/h, drains 1:1, refills at half rate)

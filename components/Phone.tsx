@@ -47,7 +47,7 @@ export function Phone() {
         </button>
 
         <div style={{ margin: "10px 0 4px", color: "#6a7280", fontSize: 11, letterSpacing: 1 }}>SET GPS WAYPOINT</div>
-        <div style={{ maxHeight: 190, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+        <div data-scroll style={{ maxHeight: 190, overflowY: "auto", touchAction: "pan-y", display: "flex", flexDirection: "column", gap: 4 }}>
           {LANDMARKS.map((l) => (
             <button
               key={l.name}

@@ -8,6 +8,7 @@ import { saveGame } from "@/lib/saveGame";
 import { Minimap } from "@/components/Minimap";
 import { BigMap } from "@/components/BigMap";
 import { Phone } from "@/components/Phone";
+import { useTouchStore } from "@/lib/touch";
 
 // Speedo/NitroBar/Waypoint each own their own store subscription and are
 // split out from HUD's own render — speedKmh/nitroFuel/waypointDist all
@@ -38,11 +39,12 @@ function NitroBar() {
   const active = useHudStore((s) => s.active);
   const nitroFuel = useHudStore((s) => s.nitroFuel);
   const nitroActive = useHudStore((s) => s.nitroActive);
+  const isTouch = useTouchStore((s) => s.isTouch);
   if (active !== "car") return null;
   return (
     <div id="nitrobar" className={nitroActive ? "active" : ""} style={{ display: "block" }}>
       <div className="nlabel">
-        NITRO <span className="nhint">(SHIFT)</span>
+        NITRO {!isTouch && <span className="nhint">(SHIFT)</span>}
       </div>
       <div className="ntrack">
         <div className="nfill" style={{ width: `${(nitroFuel * 100).toFixed(1)}%` }} />
@@ -91,8 +93,10 @@ function _UnusedLogoutButton() {
 // DOM/CSS structure ported 1:1 from the original index.html's HUD (#hud,
 // #speedo, #nitrobar, #hint, #msg, #camsel, #controls, #vig, #minimap,
 // #waypoint, #mapscreen — see app/globals.css for the matching styles,
-// copied from the original's <style> block). Not yet ported: #touch-controls
-// (mobile — desktop parity first).
+// copied from the original's <style> block). Touch devices get their own
+// controls instead (components/TouchControls.tsx) and hide the keyboard-only
+// bits (camera tabs, look slider, key legend, GFX/CAR labels) — those live
+// in the touch top row / "more" menu there.
 function GfxButton() {
   const quality = useGfxStore((s) => s.quality);
   const toggle = useGfxStore((s) => s.toggle);
@@ -111,6 +115,8 @@ function GfxButton() {
 }
 
 export function HUD() {
+  const isTouch = useTouchStore((s) => s.isTouch);
+  const toggleControlsVisible = useHudStore((s) => s.toggleControlsVisible);
   const controlsVisible = useHudStore((s) => s.controlsVisible);
   const hint = useHudStore((s) => s.hint);
   const msg = useHudStore((s) => s.msg);
@@ -127,7 +133,7 @@ export function HUD() {
         <ClockDisplay />
       </div>
 
-      <GfxButton />
+      {!isTouch && <GfxButton />}
 
       <Speedo />
       <NitroBar />
@@ -135,7 +141,7 @@ export function HUD() {
 
       {hint && (
         <div id="hint" style={{ display: "block" }}>
-          {hint}
+          {isTouch ? hint.replace(/^Press E/, "Tap E") : hint}
         </div>
       )}
 
@@ -143,6 +149,8 @@ export function HUD() {
         {msg}
       </div>
 
+      {!isTouch && (
+      <>
       <div id="camsel">
         {CAM_MODES.map((name, i) => (
           <button
@@ -170,7 +178,18 @@ export function HUD() {
         <span>{lookSensitivity.toFixed(2)}x</span>
       </div>
 
-      <div id="controls" style={{ display: controlsVisible ? "block" : "none" }}>
+      <button
+        id="helpbtn"
+        type="button"
+        className={controlsVisible ? "on" : ""}
+        onClick={toggleControlsVisible}
+        title="Keyboard controls (H)"
+        aria-expanded={controlsVisible}
+      >
+        ?
+      </button>
+      {controlsVisible && (
+      <div id="controls">
         <b>W A S D</b> move / drive
         <br />
         <b>SPACE</b> handbrake
@@ -202,13 +221,18 @@ export function HUD() {
         <b>M</b> mute engine
         <br />
         <b>P</b> phone
+        <br />
+        <b>H</b> hide this help
       </div>
+      )}
+      </>
+      )}
 
       <div id="vig" />
       <div onClick={() => setMapOpen(true)}>
         <Minimap />
       </div>
-      <div id="maphint">click map for directions</div>
+      {!isTouch && <div id="maphint">click map for directions</div>}
       <BigMap />
       <Phone />
     </>

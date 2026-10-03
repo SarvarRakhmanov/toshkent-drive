@@ -65,6 +65,16 @@ export function initAudio() {
   }
 }
 
+/** Create (first gesture) and/or resume the audio context. iOS Safari keeps a
+ * context "suspended" (or "interrupted" after a call/app switch) until it is
+ * resumed inside a user gesture, so this is safe to call on every tap/key. */
+export function unlockAudio() {
+  initAudio();
+  if (!audio || muted) return;
+  const st = audio.ctx.state as string;
+  if (st !== "running") audio.ctx.resume().catch(() => {});
+}
+
 export function toggleMute() {
   muted = !muted;
   if (audio) {

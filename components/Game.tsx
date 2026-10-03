@@ -20,7 +20,6 @@ import type { BloomEffect } from "postprocessing";
 import { SkyCycle } from "@/components/SkyCycle";
 import { skyState } from "@/lib/skyState";
 import { Weather } from "@/components/Weather";
-import { cycleWeather } from "@/lib/weatherState";
 import { City } from "@/components/City";
 import { Water } from "@/components/Water";
 import { Car } from "@/components/Car";
@@ -40,20 +39,16 @@ import { Debris } from "@/components/Debris";
 import { WaypointTracker } from "@/components/WaypointTracker";
 import { HUD } from "@/components/HUD";
 import { useGfxStore } from "@/lib/gfx";
-import { usePlayerCarStore, PLAYER_CARS } from "@/lib/playerCar";
-import { requestCarSummon } from "@/lib/vehicleSummon";
-import { worldState } from "@/lib/worldState";
 import { asset } from "@/lib/asset";
-import { useHudStore, LIGHT_MODES } from "@/lib/hudStore";
-import { initAudio, toggleMute, setMuted } from "@/lib/audio";
+import { useHudStore } from "@/lib/hudStore";
+import { unlockAudio, setMuted } from "@/lib/audio";
+import { installTouchDetection } from "@/lib/touch";
+import { TouchControls } from "@/components/TouchControls";
+import {
+  actionUse, actionSwitchVehicle, actionCamera, actionLights, actionMute, actionWeather,
+  actionMap, actionPhone, actionGraphics, actionNextCar, actionResetCar,
+} from "@/lib/actions";
 import { loadSave, saveGame } from "@/lib/saveGame";
-import { interiorDoorAction } from "@/lib/interiors";
-import { toggleVehicleFoot } from "@/lib/player";
-import { boatSwapAction } from "@/lib/boatSwap";
-import { seatAction } from "@/lib/clubSeats";
-import { armoryPickupAction } from "@/lib/armory";
-import { ticketPickupAction } from "@/lib/ticketBooth";
-import { stealTrafficAction } from "@/lib/steal";
 import { PoliceCar } from "@/components/PoliceCar";
 import { PoliceJeep } from "@/components/PoliceJeep";
 import { PatrolBoat } from "@/components/PatrolBoat";
@@ -116,71 +111,73 @@ export default function Game() {
   useEffect(() => {
     const interval = setInterval(saveGame, 3000);
     window.addEventListener("beforeunload", saveGame);
+    // iOS Safari never fires beforeunload — pagehide is its reliable "leaving" event
+    window.addEventListener("pagehide", saveGame);
     return () => {
       clearInterval(interval);
       window.removeEventListener("beforeunload", saveGame);
+      window.removeEventListener("pagehide", saveGame);
     };
   }, []);
 
   useEffect(() => {
+    installTouchDetection();
     const onKey = (e: KeyboardEvent) => {
-      initAudio(); // no-ops once already initialized; needs a real user gesture, so first key does it
+      unlockAudio(); // needs a real user gesture; first key creates the context, later ones resume it
+      // holding a key must not machine-gun cycle cars/cameras/graphics
+      if (e.repeat) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "TEXTAREA" || (t.tagName === "INPUT" && (t as HTMLInputElement).type === "text"))) return;
       const hud = useHudStore.getState();
-      if (e.code === "KeyE") {
-        // ticket pickup beats door (need the ticket before the VENU gate matters) beats
-        // sitting/standing beats gun pickup beats boat-swap beats mount beats stealing an NPC
-        if (!ticketPickupAction() && !interiorDoorAction() && !seatAction() && !armoryPickupAction() && !boatSwapAction() && !toggleVehicleFoot()) stealTrafficAction();
-      } else if (e.code === "KeyB") {
-        hud.toggleActive();
-        hud.showMsg("SWITCHED TO: " + hud.vehicleName());
-      } else if (e.code === "KeyC") {
-        hud.cycleCamMode();
-      } else if (e.code === "KeyL") {
-        hud.showMsg("HEADLIGHTS: " + LIGHT_MODES[hud.cycleLightMode()]);
-      } else if (e.code === "KeyM") {
-        hud.showMsg(toggleMute() ? "MUTED" : "UNMUTED");
-      } else if (e.code === "KeyV") {
-        hud.showMsg("WEATHER: " + cycleWeather().toUpperCase());
-      } else if (e.code === "KeyG") {
-        hud.setMapOpen(!hud.mapOpen);
-      } else if (e.code === "KeyP") {
-        hud.setPhoneOpen(!hud.phoneOpen);
-      } else if (e.code === "KeyQ") {
-        saveGame();
-        const g = useGfxStore.getState();
-        g.toggle();
-        hud.showMsg("GRAPHICS: " + useGfxStore.getState().quality.toUpperCase());
-      } else if (e.code === "KeyK") {
-        usePlayerCarStore.getState().next();
-        hud.showMsg("CAR: " + PLAYER_CARS[usePlayerCarStore.getState().index].name);
-      } else if (e.code === "KeyR" && hud.active === "car") {
-        // reset / respawn: upright on the nearest road centre-lane, facing along it
-        const { px, pz, heading } = worldState;
-        const xs = Math.round((px - 50) / 100) * 100 + 50;
-        const zs = Math.round((pz - 50) / 100) * 100 + 50;
-        const along = (a: number, b: number) => (Math.cos(heading - a) >= Math.cos(heading - b) ? a : b);
-        if (Math.abs(px - xs) <= Math.abs(pz - zs)) requestCarSummon(xs + 2.5, pz, along(0, Math.PI));
-        else requestCarSummon(px, zs + 2.5, along(Math.PI / 2, -Math.PI / 2));
-        hud.showMsg("CAR RESET");
-      } else if (e.code === "KeyH") {
-        hud.toggleControlsVisible();
-      } else if (e.code === "Escape") {
+      if (e.code === "KeyE") actionUse();
+      else if (e.code === "KeyB") actionSwitchVehicle();
+      else if (e.code === "KeyC") actionCamera();
+      else if (e.code === "KeyL") actionLights();
+      else if (e.code === "KeyM") actionMute();
+      else if (e.code === "KeyV") actionWeather();
+      else if (e.code === "KeyG") actionMap();
+      else if (e.code === "KeyP") actionPhone();
+      else if (e.code === "KeyQ") actionGraphics();
+      else if (e.code === "KeyK") actionNextCar();
+      else if (e.code === "KeyR") {
+        if (hud.active === "car") actionResetCar();
+      } else if (e.code === "KeyH") hud.toggleControlsVisible();
+      else if (e.code === "Escape") {
         hud.setMapOpen(false);
         hud.setPhoneOpen(false);
       }
     };
-    const onClick = () => initAudio();
+    // iOS only counts touchend/pointerup (not pointerdown) as a user gesture
+    // that may start audio, so unlock on all of them, not just the first one
+    const onGesture = () => unlockAudio();
+    // iOS Safari ignores user-scalable=no: block pinch/double-tap zoom and
+    // rubber-band scrolling of the page itself, but let real scroll lists
+    // (map destinations, phone) keep scrolling
+    const onTouchMove = (e: TouchEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && el.closest && el.closest("#maplist, [data-scroll]")) return;
+      if (e.cancelable) e.preventDefault();
+    };
+    const onGestureStart = (e: Event) => e.preventDefault();
     window.addEventListener("keydown", onKey);
-    window.addEventListener("pointerdown", onClick, { once: true });
+    window.addEventListener("pointerdown", onGesture);
+    window.addEventListener("pointerup", onGesture);
+    window.addEventListener("touchend", onGesture);
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+    document.addEventListener("gesturestart", onGestureStart);
     return () => {
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("pointerdown", onClick);
+      window.removeEventListener("pointerdown", onGesture);
+      window.removeEventListener("pointerup", onGesture);
+      window.removeEventListener("touchend", onGesture);
+      document.removeEventListener("touchmove", onTouchMove);
+      document.removeEventListener("gesturestart", onGestureStart);
     };
   }, []);
 
   return (
     <div style={{ position: "fixed", inset: 0 }}>
-      <Canvas key={quality} shadows={high ? "soft" : false} dpr={high ? [1, 1.5] : 0.85} camera={{ fov: 65, near: 0.1, far: 1000 }} gl={{ toneMappingExposure: 1.5 }}>
+      <Canvas key={quality} shadows={high ? "soft" : false} dpr={high ? [1, 1.5] : 0.85} camera={{ fov: 65, near: 0.1, far: 1000 }} gl={{ toneMappingExposure: 1.5 }} style={{ touchAction: "none" }}>
         <Suspense fallback={null}>
           <SkyCycle />
           {/* IBL only (background:false leaves SkyCycle's own scene.background/
@@ -296,6 +293,7 @@ export default function Game() {
         </Suspense>
       </Canvas>
       <HUD />
+      <TouchControls />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
   EASE,
 } from "@/lib/cameraLook";
 import { useHudStore } from "@/lib/hudStore";
+import { useTouchStore } from "@/lib/touch";
 
 // True 360° free-look via the Pointer Lock API — see lib/cameraLook.ts for
 // why this replaced the earlier position-mapped hover design. Click the
@@ -42,10 +43,52 @@ export function MouseLook() {
       // alt-tab), not just the very first time — requestPointerLock() is a
       // no-op while already locked, so this is safe to call unconditionally.
       if (useHudStore.getState().mapOpen) return; // clicking the map picks a destination, not the camera
-      if (document.pointerLockElement !== el) el.requestPointerLock().catch(() => {});
+      if (touchDrag.id !== null || useTouchStore.getState().isTouch) return; // phones: drag-to-look below
+      if (document.pointerLockElement === el || typeof el.requestPointerLock !== "function") return;
+      // older Safari returns undefined instead of a Promise
+      try {
+        const p = el.requestPointerLock() as unknown as Promise<void> | undefined;
+        if (p && typeof p.catch === "function") p.catch(() => {});
+      } catch {
+        /* pointer lock unsupported */
+      }
     };
 
+    // touch free-look: drag one finger on the open scene (not on a button) to
+    // look around; let go and the camera eases back behind the vehicle
+    const touchDrag: { id: number | null; x: number; y: number } = { id: null, x: 0, y: 0 };
+    const TOUCH_GAIN = 1.6;
+    const onTouchDown = (e: PointerEvent) => {
+      if (e.pointerType !== "touch" || touchDrag.id !== null) return;
+      touchDrag.id = e.pointerId;
+      touchDrag.x = e.clientX;
+      touchDrag.y = e.clientY;
+      cameraLook.locked = true;
+    };
+    const onTouchMove = (e: PointerEvent) => {
+      if (e.pointerId !== touchDrag.id) return;
+      const k = useHudStore.getState().lookSensitivity * TOUCH_GAIN;
+      const dx = e.clientX - touchDrag.x;
+      const dy = e.clientY - touchDrag.y;
+      touchDrag.x = e.clientX;
+      touchDrag.y = e.clientY;
+      cameraLook.targetYaw = wrapAngle(cameraLook.targetYaw - dx * YAW_SENSITIVITY * k);
+      cameraLook.targetPitch = Math.max(MAX_PITCH_DOWN, Math.min(MAX_PITCH_UP, cameraLook.targetPitch + dy * PITCH_SENSITIVITY * k));
+    };
+    const onTouchUp = (e: PointerEvent) => {
+      if (e.pointerId !== touchDrag.id) return;
+      touchDrag.id = null;
+      cameraLook.locked = false;
+      cameraLook.targetYaw = 0;
+      cameraLook.targetPitch = 0;
+    };
+    el.addEventListener("pointerdown", onTouchDown);
+    window.addEventListener("pointermove", onTouchMove);
+    window.addEventListener("pointerup", onTouchUp);
+    window.addEventListener("pointercancel", onTouchUp);
+
     const onLockChange = () => {
+      if (touchDrag.id !== null) return;
       cameraLook.locked = document.pointerLockElement === el;
       if (!cameraLook.locked) {
         // released (Esc, alt-tab, map opened) — ease the lean back to centre
@@ -60,9 +103,13 @@ export function MouseLook() {
     document.addEventListener("mousemove", onMove);
     return () => {
       el.removeEventListener("click", onClick);
+      el.removeEventListener("pointerdown", onTouchDown);
+      window.removeEventListener("pointermove", onTouchMove);
+      window.removeEventListener("pointerup", onTouchUp);
+      window.removeEventListener("pointercancel", onTouchUp);
       document.removeEventListener("pointerlockchange", onLockChange);
       document.removeEventListener("mousemove", onMove);
-      if (document.pointerLockElement === el) document.exitPointerLock();
+      if (document.pointerLockElement === el) document.exitPointerLock?.();
     };
   }, [gl]);
 
@@ -83,7 +130,7 @@ export function MouseLook() {
   const mapOpen = useHudStore((s) => s.mapOpen);
   useEffect(() => {
     if (mapOpen && document.pointerLockElement === gl.domElement) {
-      document.exitPointerLock();
+      document.exitPointerLock?.();
     }
   }, [mapOpen, gl]);
 
