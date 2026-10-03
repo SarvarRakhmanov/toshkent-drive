@@ -32,6 +32,10 @@ export function CreditsPanel() {
         (Sketchfab, CC BY 4.0). Kia Seltos model supplied by the owner.
       </p>
       <p>
+        Cockpit interiors: <b>Autonomous GT Car Interior Design</b> by benlockett and{" "}
+        <b>Car interior</b> by Gerhald (Sketchfab, CC BY 4.0, modified).
+      </p>
+      <p>
         Traffic cars by DanielZhabotinsky and roh3d. Buildings by cn-entertainment, MrAeterna,
         bral_unit, Lost_Gecko and Colin.Greenall (Sketchfab, CC BY 4.0). Sky HDRI and tree
         textures from Poly Haven (CC0).

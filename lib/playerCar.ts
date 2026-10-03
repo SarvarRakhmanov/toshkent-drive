@@ -15,15 +15,20 @@ export interface PlayerCarDef {
    *  plate-centre heights above the ground (m); depth is found by raycasting
    *  onto the bumper so the plate sits just off the body surface. */
   plate?: { url: string; frontY: number; rearY: number };
+  /** Cockpit camera (v1.4): which shared interior (components/CarInterior.tsx)
+   *  and the driver's eye in the car's local frame — x = toward the driver's
+   *  door (+ = left, LHD), y = metres above the ground, z = forward of the
+   *  body centre. */
+  cockpit: { interior: "gt" | "classic"; eye: [number, number, number]; scale?: number };
 }
 
 export const PLAYER_CARS: PlayerCarDef[] = [
-  { id: "seltos", name: "KIA SELTOS", url: "/models/cars/seltos.glb", rotY: Math.PI / 2, length: 4.37, paint: /carpaint/i, color: "#b7c0b0", plate: { url: "/textures/plates/seltos.png", frontY: 0.57, rearY: 0.9 } },
-  { id: "lacetti", name: "CHEVROLET LACETTI", url: "/models/cars/lacetti.glb", rotY: 0, length: 4.51, plate: { url: "/textures/plates/lacetti.png", frontY: 0.4, rearY: 0.7 } },
-  { id: "m3", name: "BMW M3 E30", url: "/models/cars/bmw-m3.glb", rotY: 0, length: 4.36, paint: /body|paint|carpaint/i, color: "#e8e6e0" },
-  { id: "k5", name: "KIA K5", url: "/models/cars/k5.glb", rotY: 0, length: 4.7, paint: /body|paint|carpaint/i, color: "#1c2126" },
+  { id: "seltos", name: "KIA SELTOS", url: "/models/cars/seltos.glb", rotY: Math.PI / 2, length: 4.37, paint: /carpaint/i, color: "#b7c0b0", plate: { url: "/textures/plates/seltos.png", frontY: 0.57, rearY: 0.9 }, cockpit: { interior: "gt", eye: [0.37, 1.34, -0.12] } },
+  { id: "lacetti", name: "CHEVROLET LACETTI", url: "/models/cars/lacetti.glb", rotY: 0, length: 4.51, plate: { url: "/textures/plates/lacetti.png", frontY: 0.4, rearY: 0.7 }, cockpit: { interior: "classic", eye: [0.36, 1.14, -0.22], scale: 1.04 } },
+  { id: "m3", name: "BMW M3 E30", url: "/models/cars/bmw-m3.glb", rotY: 0, length: 4.36, paint: /body|paint|carpaint/i, color: "#e8e6e0", cockpit: { interior: "classic", eye: [0.35, 1.09, -0.3] } },
+  { id: "k5", name: "KIA K5", url: "/models/cars/k5.glb", rotY: 0, length: 4.7, paint: /body|paint|carpaint/i, color: "#1c2126", cockpit: { interior: "gt", eye: [0.38, 1.14, -0.2] } },
   // "BMW M3 Competition" by VTX (Sketchfab), CC BY-NC-SA 4.0, decimated/compressed (see CREDITS.md)
-  { id: "m3c", name: "BMW M3 COMPETITION", url: "/models/cars/bmw-m3-competition.glb", rotY: Math.PI, length: 4.79 },
+  { id: "m3c", name: "BMW M3 COMPETITION", url: "/models/cars/bmw-m3-competition.glb", rotY: Math.PI, length: 4.79, cockpit: { interior: "gt", eye: [0.38, 1.1, -0.35], scale: 1.04 } },
 ];
 
 const KEY = "td_player_car";

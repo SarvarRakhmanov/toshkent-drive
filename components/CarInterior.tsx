@@ -1,424 +1,263 @@
 "use client";
 
-import { useRef } from "react";
-import { useFrame } from "@/lib/safeFrame";
+import { Suspense, useMemo, useRef } from "react";
+import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import { tex } from "@/lib/airportTextures";
-import { DEFAULT_HANDLING, type CarState } from "@/lib/carPhysics";
+import { useFrame } from "@/lib/safeFrame";
+import type { CarState } from "@/lib/carPhysics";
 import { useHudStore } from "@/lib/hudStore";
+import { usePlayerCarStore, PLAYER_CARS, type PlayerCarDef } from "@/lib/playerCar";
+import { RIDE_HEIGHT } from "@/components/SupercarBody";
+import { BootHold } from "@/components/ReadyGate";
+import { asset } from "@/lib/asset";
 
-// Player-car cockpit interior, mounted inside components/Car.tsx's own
-// <RigidBody> so it moves/rotates with the chassis for free — same "child of
-// the kinematic body" trick components/AirlinerCockpit.tsx already uses for
-// the airliner's flight deck (module-level shared materials, canvas-baked
-// instrument faces via lib/airportTextures.ts's tex(), live values wired
-// through refs mutated in one useFrame — never React state).
+// Cockpit view (camMode 1) for the player's car — v1.4 rewrite.
 //
-// Placed only for components/Car.tsx (the player's own sedan) — Traffic.tsx/
-// PoliceCar.tsx share components/SupercarBody.tsx directly and never mount
-// this, so there is exactly one instance of this geometry live at a time.
+// Two shared, CC-BY Sketchfab cabins (see CREDITS.md), one per car class,
+// baked by scripts/optimize-interiors.mjs into a common frame: metres, the
+// driver's EYE at the origin, +Z = nose, +X = driver's door (LHD), with the
+// steering wheel split out under a "steering-wheel" pivot whose local +Z is
+// the column axis (userData.rimRadius = grip radius):
+//   gt      — "Autonomous GT Car Interior" (modern: M3 Competition, K5, Seltos)
+//   classic — "Car interior" (XJ220-style analog dash: Lacetti, M3 E30)
+// The cabin is placed at the car's own eye point (PlayerCarDef.cockpit, the
+// same point lib/cameraRig.ts puts the camera at), rendered only in cockpit
+// mode, and the exterior body is hidden meanwhile (its own seats/roof would
+// otherwise poke through the cabin and block the view).
 //
-// Anchored on lib/cameraRig.ts's camMode===1 (four-wheeler) branch:
-//   ex = tx + cos(th)*cockpitForward + dx*cockpitAhead
-//   ez = tz - sin(th)*cockpitForward + dz*cockpitAhead
-//   ey = ty + cockpitEyeHeight
-// tx/ty/tz is this RigidBody's own translation and th its heading, so in
-// this component's own local frame (x=right, y=up, z=forward/nose — the
-// same basis components/SupercarBody.tsx's meshes use) the driver's eye
-// sits at local (cockpitForward, cockpitEyeHeight, cockpitAhead) using the
-// CURRENT car defaults (1.3 / -0.35 / 0.15) — not importable (cameraRig.ts
-// keeps them as inline defaults, and this task doesn't touch that file), so
-// they're re-declared here as the placement anchor.
-const EYE_X = -0.35;
-const EYE_Y = 1.3;
-const EYE_Z = 0.15;
+// The driver is the player's robot: procedural stylised robot hands grip the
+// rim at 10 and 2 o'clock (children of the wheel pivot, so they turn with
+// it) and two-bone robot arms reach back to fixed shoulders.
 
-const DASH_MAT = new THREE.MeshStandardMaterial({ color: "#1b1d22", roughness: 0.82 });
-const TRIM_MAT = new THREE.MeshStandardMaterial({ color: "#0d0f13", metalness: 0.45, roughness: 0.45 });
-const LEATHER_MAT = new THREE.MeshStandardMaterial({ color: "#242024", roughness: 0.78 });
-const HEADLINER_MAT = new THREE.MeshStandardMaterial({ color: "#2a2c30", roughness: 0.9 });
-const CHROME_MAT = new THREE.MeshStandardMaterial({ color: "#c7ccd4", metalness: 0.95, roughness: 0.18 });
-const WHEEL_RIM_MAT = new THREE.MeshStandardMaterial({ color: "#18181a", roughness: 0.7 });
-const SWITCH_MAT = new THREE.MeshStandardMaterial({ color: "#3a3d44", roughness: 0.55 });
-const MIRROR_MAT = new THREE.MeshStandardMaterial({ color: "#dfe6ee", metalness: 0.92, roughness: 0.06 });
-const NEEDLE_MAT = new THREE.MeshBasicMaterial({ color: "#ff2b2b" });
-const KNOB_MAT = new THREE.MeshStandardMaterial({ color: "#0e0f11", roughness: 0.4, metalness: 0.3 });
+const INTERIORS = {
+  gt: "/models/interiors/gt-interior.glb",
+  classic: "/models/interiors/sedan-interior.glb",
+} as const;
+type InteriorKind = keyof typeof INTERIORS;
 
-// warning-light cluster colours — battery/oil/engine/seatbelt/highbeam/fuel
-const WARN_COLORS = ["#ff3b30", "#ff3b30", "#ffb020", "#ff3b30", "#3a8bff", "#ffb020"];
-const WARN_MATS = WARN_COLORS.map((c) => new THREE.MeshBasicMaterial({ color: c }));
-
-// Classic 270° automotive gauge sweep: 0 at bottom-left (-135°), max at
-// bottom-right (+135°), through the top at mid-scale. Shared by the needle's
-// live rotation.z (below) and the tick placement baked into the gauge face
-// texture, so the two can never drift out of alignment with each other.
-function needleAngle(frac: number) {
-  return THREE.MathUtils.degToRad(135 - THREE.MathUtils.clamp(frac, 0, 1) * 270);
-}
-function needlePoint(cx: number, cy: number, r: number, frac: number): [number, number] {
-  const a = needleAngle(frac);
-  return [cx - r * Math.sin(a), cy - r * Math.cos(a)];
+/** cameraRig args for the current player car's cockpit (local car frame). */
+export function cockpitCameraArgs(def: PlayerCarDef) {
+  const [x, y, z] = def.cockpit.eye;
+  // look-at drop 30 m ahead: the GT cabin's wheel sits lower, so pitch down more to keep wheel + hands in view
+  return { cockpitForward: x, cockpitEyeHeight: y - RIDE_HEIGHT, cockpitAhead: z, cockpitLookDrop: def.cockpit.interior === "gt" ? 4.2 : 2.2 };
 }
 
-// Gauge face — background, bezel, minor/major ticks, redline arc and the
-// unit label — baked once to a canvas, same idiom as lib/airportTextures.ts's
-// own tex()-based RUNWAY_TEX/FUSELAGE_TEX. The needle itself is a separate
-// rotating mesh (below), not part of this texture.
-function gaugeTex(size: number, max: number, majorStep: number, minorStep: number, redlineFrom: number, unit: string) {
-  return tex(size, size, (g) => {
-    const cx = size / 2, cy = size / 2, R = size / 2 - 6;
-    g.fillStyle = "#0e1013";
-    g.beginPath();
-    g.arc(cx, cy, R, 0, Math.PI * 2);
-    g.fill();
-    g.strokeStyle = "#3a3d44";
-    g.lineWidth = 5;
-    g.stroke();
+// steering-wheel turns per unit of car.steerAng (lib/carPhysics.ts), capped
+// so an arm never sweeps across the windscreen (about 85° each way)
+const WHEEL_RATIO = 2.4;
+const WHEEL_MAX = 1.5;
 
-    // redline arc, swept in small steps rather than ctx.arc()'s start/end
-    // angles so it always tracks needleAngle()'s own winding exactly
-    g.beginPath();
-    for (let i = 0; i <= 32; i++) {
-      const frac = redlineFrom / max + (i / 32) * (1 - redlineFrom / max);
-      const [x, y] = needlePoint(cx, cy, R - R * 0.09, frac);
-      if (i === 0) g.moveTo(x, y);
-      else g.lineTo(x, y);
-    }
-    g.strokeStyle = "#c81f1f";
-    g.lineWidth = R * 0.07;
-    g.lineCap = "round";
-    g.stroke();
+// ---- robot arms / hands (shared geometry + materials, built once) ----------
+const ARM_MAT = new THREE.MeshStandardMaterial({ color: "#4a525e", metalness: 0.7, roughness: 0.5, emissive: "#101318" });
+const JOINT_MAT = new THREE.MeshStandardMaterial({ color: "#e0782a", metalness: 0.4, roughness: 0.45, emissive: "#2a1204" });
+const HAND_MAT = new THREE.MeshStandardMaterial({ color: "#3b424c", metalness: 0.8, roughness: 0.35, emissive: "#0e1116" });
+const SEG_GEO = new THREE.CylinderGeometry(1, 1, 1, 10, 1).translate(0, 0.5, 0); // unit cylinder from y=0 to y=1
+const JOINT_GEO = new THREE.SphereGeometry(1, 12, 8);
 
-    for (let v = 0; v <= max + 1e-6; v += minorStep) {
-      const frac = v / max;
-      const major = Math.abs(v % majorStep) < 1e-6;
-      const [ix, iy] = needlePoint(cx, cy, R * 0.8, frac);
-      const [ox, oy] = needlePoint(cx, cy, major ? R * 0.94 : R * 0.87, frac);
-      g.strokeStyle = v >= redlineFrom ? "#ff6a5f" : "#cfd4dc";
-      g.lineWidth = major ? 3 : 1.3;
-      g.beginPath();
-      g.moveTo(ix, iy);
-      g.lineTo(ox, oy);
-      g.stroke();
-      if (major) {
-        const [tx2, ty2] = needlePoint(cx, cy, R * 0.65, frac);
-        g.fillStyle = "#e6e9ee";
-        g.font = `${Math.round(R * 0.15)}px sans-serif`;
-        g.textAlign = "center";
-        g.textBaseline = "middle";
-        g.fillText(String(Math.round(v)), tx2, ty2);
-      }
+/** A stylised robot hand gripping a rim tube that runs along local X: palm
+ *  plate on the driver's side, four curled finger segments over the top and
+ *  a thumb underneath. Built around the grip point (local origin). */
+function makeHand(side: 1 | -1, rim: number): THREE.Group {
+  const g = new THREE.Group();
+  const t = Math.max(0.018, rim * 0.13); // rim tube radius guess
+  const palm = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.05, 0.03), HAND_MAT);
+  palm.position.set(0, -0.005, t + 0.018);
+  g.add(palm);
+  for (let i = 0; i < 4; i++) {
+    const x = -0.03 + i * 0.02;
+    // proximal over the top, distal down the far side
+    const prox = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.016, 0.034), HAND_MAT);
+    prox.position.set(x, t + 0.012, 0.012);
+    prox.rotation.x = -0.35;
+    const dist = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.03, 0.015), HAND_MAT);
+    dist.position.set(x, t * 0.2, -t - 0.01);
+    const knuckle = new THREE.Mesh(JOINT_GEO, JOINT_MAT);
+    knuckle.scale.setScalar(0.0085);
+    knuckle.position.set(x, t + 0.012, t + 0.02);
+    g.add(prox, dist, knuckle);
+  }
+  const thumb = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.018, 0.04), HAND_MAT);
+  thumb.position.set(-side * 0.045, -t - 0.006, 0.01);
+  thumb.rotation.y = side * 0.5;
+  g.add(thumb);
+  // wrist cuff
+  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.03, 0.04, 10), JOINT_MAT);
+  cuff.rotation.x = Math.PI / 2;
+  cuff.position.set(0, -0.012, t + 0.05);
+  g.add(cuff);
+  return g;
+}
+
+interface Arm {
+  shoulder: THREE.Vector3; // in cabin (eye) space
+  wrist: THREE.Object3D; // anchor on the hand
+  upper: THREE.Mesh;
+  fore: THREE.Mesh;
+  elbow: THREE.Mesh;
+  side: 1 | -1;
+}
+
+const UPPER_LEN = 0.3;
+const FORE_LEN = 0.3;
+const _w = new THREE.Vector3();
+const _d = new THREE.Vector3();
+const _pole = new THREE.Vector3();
+const _e = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);
+
+function placeSegment(mesh: THREE.Mesh, a: THREE.Vector3, b: THREE.Vector3, r: number) {
+  _d.subVectors(b, a);
+  const len = _d.length();
+  mesh.position.copy(a);
+  mesh.quaternion.setFromUnitVectors(_up, _d.multiplyScalar(1 / Math.max(len, 1e-6)));
+  mesh.scale.set(r, len, r);
+}
+
+/** two-bone IK: shoulder -> elbow -> wrist, elbow bent outward and down */
+function solveArm(arm: Arm, cabin: THREE.Object3D) {
+  arm.wrist.getWorldPosition(_w);
+  cabin.worldToLocal(_w);
+  const s = arm.shoulder;
+  _d.subVectors(_w, s);
+  const dist = Math.min(_d.length(), UPPER_LEN + FORE_LEN - 1e-3);
+  _d.normalize();
+  const a = (UPPER_LEN * UPPER_LEN - FORE_LEN * FORE_LEN + dist * dist) / (2 * dist);
+  const h = Math.sqrt(Math.max(0, UPPER_LEN * UPPER_LEN - a * a));
+  _pole.set(arm.side * 0.8, -1, 0).addScaledVector(_d, -_pole.dot(_d)).normalize();
+  _e.copy(s).addScaledVector(_d, a).addScaledVector(_pole, h);
+  placeSegment(arm.upper, s, _e, 0.022);
+  placeSegment(arm.fore, _e, _w, 0.017);
+  arm.elbow.position.copy(_e);
+}
+
+function Cabin({ kind, def, carRef }: { kind: InteriorKind; def: PlayerCarDef; carRef: React.RefObject<CarState> }) {
+  const gltf = useGLTF(asset(INTERIORS[kind]));
+  const built = useMemo(() => {
+    const root = gltf.scene.clone(true);
+    root.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.castShadow = false;
+      m.receiveShadow = false;
+      m.frustumCulled = false; // always around the camera
+    });
+    if (kind === "classic") {
+      // the source cabin is untextured clay: give it a charcoal trim + black wheel
+      root.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        const wheel = m.name.includes("steering");
+        m.material = new THREE.MeshStandardMaterial({ color: wheel ? "#16171a" : "#3c3d42", roughness: wheel ? 0.6 : 0.85, metalness: 0.05, emissive: wheel ? "#050506" : "#121214", side: THREE.DoubleSide });
+      });
+    } else {
+      // no cabin dome light (a light toggling on/off re-compiles every lit
+      // shader) — a faint emissive floor keeps the shaded cabin from going black
+      root.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        const src = m.material as THREE.MeshStandardMaterial;
+        const mat = src.clone();
+        mat.emissive = new THREE.Color("#ffffff");
+        mat.emissiveMap = src.map;
+        mat.emissiveIntensity = 0.16;
+        m.material = mat;
+      });
     }
-    g.fillStyle = "#8a919c";
-    g.font = `${Math.round(R * 0.13)}px sans-serif`;
-    g.textAlign = "center";
-    g.fillText(unit, cx, cy + R * 0.44);
+    const wheel = root.getObjectByName("steering-wheel") ?? new THREE.Group();
+    const rim = (wheel.userData.rimRadius as number) || 0.17;
+    const baseQ = wheel.quaternion.clone();
+    // grips are laid out in cabin space (root is still identity here), then
+    // re-parented into the wheel pivot with attach() so they turn with it
+    root.updateMatrixWorld(true);
+    const hub = wheel.getWorldPosition(new THREE.Vector3());
+    const axis = new THREE.Vector3(0, 0, 1).applyQuaternion(wheel.getWorldQuaternion(new THREE.Quaternion())); // toward the driver
+    const upP = new THREE.Vector3(0, 1, 0).addScaledVector(axis, -axis.y).normalize();
+    const leftP = new THREE.Vector3().crossVectors(upP, axis).normalize(); // in-plane, toward the driver's door (+X)
+    if (leftP.x < 0) leftP.negate();
+    const arms: Arm[] = [];
+    for (const side of [1, -1] as const) {
+      // left hand at 10 o'clock, right hand at 2 o'clock
+      const radial = new THREE.Vector3().addScaledVector(upP, Math.cos(Math.PI / 3)).addScaledVector(leftP, side * Math.sin(Math.PI / 3)).normalize();
+      const tangent = new THREE.Vector3().crossVectors(radial, axis).normalize();
+      const grip = new THREE.Group();
+      grip.position.copy(hub).addScaledVector(radial, rim);
+      grip.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(tangent, radial, axis));
+      grip.add(makeHand(side, rim));
+      const wristAnchor = new THREE.Object3D();
+      wristAnchor.position.set(0, -0.01, Math.max(0.018, rim * 0.13) + 0.07);
+      grip.add(wristAnchor);
+      root.add(grip);
+      grip.updateMatrixWorld(true);
+      wheel.attach(grip);
+      const upper = new THREE.Mesh(SEG_GEO, ARM_MAT);
+      const fore = new THREE.Mesh(SEG_GEO, ARM_MAT);
+      const elbow = new THREE.Mesh(JOINT_GEO, JOINT_MAT);
+      elbow.scale.setScalar(0.028);
+      const shoulderBall = new THREE.Mesh(JOINT_GEO, JOINT_MAT);
+      const shoulder = new THREE.Vector3(side * 0.19, -0.27, -0.12);
+      shoulderBall.position.copy(shoulder);
+      shoulderBall.scale.setScalar(0.05);
+      for (const m of [upper, fore, elbow, shoulderBall]) m.frustumCulled = false;
+      root.add(upper, fore, elbow, shoulderBall);
+      arms.push({ shoulder, wrist: wristAnchor, upper, fore, elbow, side });
+    }
+    return { root, wheel, baseQ, arms };
+  }, [gltf, kind]);
+
+  const q = useMemo(() => new THREE.Quaternion(), []);
+  const zAxis = useMemo(() => new THREE.Vector3(0, 0, 1), []);
+  useFrame(() => {
+    const g = built.root;
+    if (!g.parent?.visible) return;
+    q.setFromAxisAngle(zAxis, THREE.MathUtils.clamp(carRef.current.steerAng * WHEEL_RATIO, -WHEEL_MAX, WHEEL_MAX));
+    built.wheel.quaternion.copy(built.baseQ).multiply(q);
+    g.updateMatrixWorld(true);
+    for (const a of built.arms) solveArm(a, g);
   });
-}
 
-const SPEEDO_MAX = 220; // km/h — generous headroom over DEFAULT_HANDLING.max*3.6 (144) plus nitro
-const SPEEDO_TEX = gaugeTex(256, SPEEDO_MAX, 20, 10, 180, "km/h");
-const SPEEDO_MAT = new THREE.MeshBasicMaterial({ map: SPEEDO_TEX });
-const TACH_MAX = 8; // x1000 rpm — no real engine model here, tach is speed-proportional (see useFrame below)
-const TACH_TEX = gaugeTex(256, TACH_MAX, 1, 0.5, 6.5, "x1000 rpm");
-const TACH_MAT = new THREE.MeshBasicMaterial({ map: TACH_TEX });
-
-// One speaker grille — concentric rings + scattered perforations, same
-// canvas-bake idiom as the gauges above, just simpler.
-const GRILLE_TEX = tex(64, 64, (g) => {
-  g.fillStyle = "#0c0d10";
-  g.fillRect(0, 0, 64, 64);
-  g.strokeStyle = "#232529";
-  g.lineWidth = 1.4;
-  for (let r = 6; r < 30; r += 6) {
-    g.beginPath();
-    g.arc(32, 32, r, 0, Math.PI * 2);
-    g.stroke();
-  }
-  for (let i = 0; i < 50; i++) {
-    const a = Math.random() * Math.PI * 2;
-    const r = Math.random() * 29;
-    g.fillStyle = "rgba(0,0,0,.55)";
-    g.beginPath();
-    g.arc(32 + Math.cos(a) * r, 32 + Math.sin(a) * r, 1, 0, Math.PI * 2);
-    g.fill();
-  }
-});
-const GRILLE_MAT = new THREE.MeshBasicMaterial({ map: GRILLE_TEX });
-
-// One dashboard vent — three angled slats over a dark recess.
-function Vent({ x }: { x: number }) {
-  return (
-    <group position={[x, 1.14, 0.98]}>
-      <mesh material={TRIM_MAT}>
-        <boxGeometry args={[0.16, 0.07, 0.05]} />
-      </mesh>
-      {[-0.02, 0, 0.02].map((z) => (
-        <mesh key={z} position={[0, 0.005, z]} rotation={[0.5, 0, 0]} material={SWITCH_MAT}>
-          <boxGeometry args={[0.13, 0.01, 0.03]} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-// One instrument dial — face texture + hood + a live needle. frac() reads
-// the current 0..1 value each frame; the needle mesh rotates in place, the
-// face texture never changes.
-function Dial({
-  x,
-  mat,
-  needleRef,
-}: {
-  x: number;
-  mat: THREE.MeshBasicMaterial;
-  needleRef: React.RefObject<THREE.Mesh | null>;
-}) {
-  return (
-    <group position={[x, 0, 0]}>
-      {/* hood, shading the dial from wash-out */}
-      <mesh position={[0, 0.02, -0.03]} material={TRIM_MAT}>
-        <boxGeometry args={[0.22, 0.22, 0.06]} />
-      </mesh>
-      <mesh rotation={[0, Math.PI, 0]} material={mat}>
-        <circleGeometry args={[0.095, 28]} />
-      </mesh>
-      <mesh ref={needleRef} position={[0, 0, 0.005]} material={NEEDLE_MAT}>
-        <boxGeometry args={[0.006, 0.075, 0.003]} />
-      </mesh>
-      <mesh position={[0, 0, 0.008]} material={CHROME_MAT}>
-        <cylinderGeometry args={[0.012, 0.012, 0.01, 10]} />
-      </mesh>
-    </group>
-  );
-}
-
-const GAUGE_POS: [number, number, number] = [EYE_X, EYE_Y - 0.02, EYE_Z + 0.71];
-
-function GaugeCluster({
-  speedNeedle,
-  tachNeedle,
-}: {
-  speedNeedle: React.RefObject<THREE.Mesh | null>;
-  tachNeedle: React.RefObject<THREE.Mesh | null>;
-}) {
-  return (
-    <group position={GAUGE_POS} rotation={[-0.25, Math.PI, 0]}>
-      <mesh position={[0, 0, -0.02]} material={TRIM_MAT}>
-        <boxGeometry args={[0.46, 0.24, 0.04]} />
-      </mesh>
-      <Dial x={-0.11} mat={SPEEDO_MAT} needleRef={speedNeedle} />
-      <Dial x={0.11} mat={TACH_MAT} needleRef={tachNeedle} />
-      {/* warning-light cluster, between the two dials */}
-      {WARN_MATS.map((m, i) => (
-        <mesh key={i} position={[-0.045 + (i % 3) * 0.045, 0.075 - Math.floor(i / 3) * 0.03, 0.001]} material={m}>
-          <boxGeometry args={[0.018, 0.012, 0.002]} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-const WHEEL_POS: [number, number, number] = [EYE_X, EYE_Y - 0.35, EYE_Z + 0.47];
-const WHEEL_TILT = 1.15; // column rake — top of the wheel leans away from the driver
-const WHEEL_RADIUS = 0.17;
-const SPOKE_ANGLES = [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3];
-
-function SteeringWheel({ wheelRef }: { wheelRef: React.RefObject<THREE.Group | null> }) {
-  return (
-    <group position={WHEEL_POS}>
-      {/* steering column, fixed */}
-      <mesh position={[0, -0.28, -0.22]} rotation={[WHEEL_TILT, 0, 0]} material={TRIM_MAT}>
-        <cylinderGeometry args={[0.035, 0.045, 0.5, 10]} />
-      </mesh>
-      {/* wheel itself — tilt is baked into this group's static rotation.x;
-          rotation.z is the live steering angle, set every frame below. With
-          three's default XYZ Euler order the z-spin below applies about the
-          already-tilted local Z axis, i.e. the real column axis. */}
-      <group ref={wheelRef} rotation={[WHEEL_TILT, 0, 0]}>
-        <mesh material={WHEEL_RIM_MAT}>
-          <torusGeometry args={[WHEEL_RADIUS, 0.02, 10, 26]} />
-        </mesh>
-        {SPOKE_ANGLES.map((a) => (
-          <mesh key={a} rotation={[0, 0, a]} position={[Math.sin(a) * WHEEL_RADIUS * 0.5, Math.cos(a) * WHEEL_RADIUS * 0.5, 0]} material={CHROME_MAT}>
-            <boxGeometry args={[0.03, WHEEL_RADIUS * 0.9, 0.025]} />
-          </mesh>
-        ))}
-        <mesh material={TRIM_MAT}>
-          <cylinderGeometry args={[0.04, 0.04, 0.05, 14]} />
-        </mesh>
-      </group>
-    </group>
-  );
-}
-
-// Centre console — gear shifter, a switch row and two cup holders, running
-// back from the dash between the seats.
-function CenterConsole() {
-  return (
-    <group position={[0.05, 0.72, 0.35]}>
-      <mesh material={TRIM_MAT}>
-        <boxGeometry args={[0.34, 0.14, 0.9]} />
-      </mesh>
-      {/* gear shifter */}
-      <group position={[-0.04, 0.09, 0.18]}>
-        <mesh material={CHROME_MAT}>
-          <cylinderGeometry args={[0.012, 0.012, 0.16, 8]} />
-        </mesh>
-        <mesh position={[0, 0.1, 0]} material={KNOB_MAT}>
-          <sphereGeometry args={[0.03, 12, 12]} />
-        </mesh>
-        <mesh position={[0, -0.07, 0]} material={TRIM_MAT}>
-          <boxGeometry args={[0.1, 0.02, 0.16]} />
-        </mesh>
-      </group>
-      {/* switch row */}
-      {[-0.28, -0.14, 0, 0.14, 0.28].map((z, i) => (
-        <mesh key={z} position={[0.08, 0.08, z]} material={i === 2 ? WARN_MATS[0] : SWITCH_MAT}>
-          <boxGeometry args={[0.05, 0.02, 0.05]} />
-        </mesh>
-      ))}
-      {/* cup holders */}
-      {[-1, 1].map((s) => (
-        <mesh key={s} position={[s * 0.1, 0.075, -0.36]} rotation={[Math.PI / 2, 0, 0]} material={TRIM_MAT}>
-          <torusGeometry args={[0.045, 0.008, 8, 16]} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-// A-pillars (windshield-to-header) + a simple roof header/window-frame band,
-// so the glasshouse reads as a real cabin from inside rather than open air.
-function PillarsAndFrame() {
-  return (
-    <group>
-      {[1, -1].map((s) => (
-        <mesh key={s} position={[s * 0.6, 1.25, 0.82]} rotation={[0, 0, s * -0.55]} material={TRIM_MAT} castShadow>
-          <boxGeometry args={[0.07, 0.85, 0.09]} />
-        </mesh>
-      ))}
-      <mesh position={[0, 1.64, 0.55]} material={TRIM_MAT}>
-        <boxGeometry args={[1.55, 0.08, 0.4]} />
-      </mesh>
-      {/* side window frame, driver door */}
-      <mesh position={[-0.86, 1.35, 0.15]} material={TRIM_MAT}>
-        <boxGeometry args={[0.04, 0.55, 0.9]} />
-      </mesh>
-    </group>
-  );
-}
-
-// Headliner + folded sun visors.
-function Headliner() {
-  return (
-    <group>
-      <mesh position={[0, 1.66, 0.35]} material={HEADLINER_MAT}>
-        <boxGeometry args={[1.5, 0.03, 1.15]} />
-      </mesh>
-      {[1, -1].map((s) => (
-        <mesh key={s} position={[s * 0.4, 1.62, 0.85]} rotation={[0.1, 0, 0]} material={HEADLINER_MAT}>
-          <boxGeometry args={[0.34, 0.02, 0.16]} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-// Driver door card: armrest, window switch, door pull/handle and a speaker
-// grille — the side the cockpit camera actually sees.
-function DoorPanel() {
-  return (
-    <group position={[-0.88, 1.0, 0.2]}>
-      <mesh material={LEATHER_MAT}>
-        <boxGeometry args={[0.05, 0.55, 0.85]} />
-      </mesh>
-      {/* armrest */}
-      <mesh position={[0.02, -0.05, 0.05]} material={TRIM_MAT}>
-        <boxGeometry args={[0.08, 0.06, 0.35]} />
-      </mesh>
-      {/* window switch */}
-      <mesh position={[0.028, -0.05, 0.2]} material={SWITCH_MAT}>
-        <boxGeometry args={[0.02, 0.015, 0.05]} />
-      </mesh>
-      {/* door pull/handle */}
-      <mesh position={[0.03, 0.08, -0.05]} material={CHROME_MAT}>
-        <boxGeometry args={[0.03, 0.03, 0.22]} />
-      </mesh>
-      {/* speaker grille */}
-      <mesh position={[0.026, 0.22, 0.3]} rotation={[0, Math.PI / 2, 0]} material={GRILLE_MAT}>
-        <circleGeometry args={[0.09, 20]} />
-      </mesh>
-    </group>
-  );
-}
-
-// Rearview mirror — static housing (no render-to-texture reflection, out of
-// scope per the task) hung off the header on a stalk.
-function RearviewMirror() {
-  return (
-    <group position={[0, 1.6, 0.72]}>
-      <mesh position={[0, -0.06, 0]} material={TRIM_MAT}>
-        <cylinderGeometry args={[0.012, 0.012, 0.12, 8]} />
-      </mesh>
-      <mesh position={[0, -0.13, 0]} material={TRIM_MAT}>
-        <boxGeometry args={[0.16, 0.045, 0.02]} />
-      </mesh>
-      <mesh position={[0, -0.13, 0.011]} material={MIRROR_MAT}>
-        <planeGeometry args={[0.14, 0.035]} />
-      </mesh>
-    </group>
-  );
+  const [x, y, z] = def.cockpit.eye;
+  const s = def.cockpit.scale ?? 1;
+  return <primitive object={built.root} position={[x, y - RIDE_HEIGHT, z]} scale={s} />;
 }
 
 export function CarInterior({ carRef }: { carRef: React.RefObject<CarState> }) {
   const group = useRef<THREE.Group>(null);
-  const wheelRef = useRef<THREE.Group>(null);
-  const speedNeedle = useRef<THREE.Mesh>(null);
-  const tachNeedle = useRef<THREE.Mesh>(null);
+  const index = usePlayerCarStore((s) => s.index);
+  const def = PLAYER_CARS[index];
+  const wasCockpit = useRef(false);
 
   useFrame(() => {
     const g = group.current;
     if (!g) return;
-    // only the cockpit camera ever sees this — same isActive gate
-    // components/Car.tsx's own useFrame uses, plus camMode===1
     const s = useHudStore.getState();
-    const visible = s.active === "car" && s.camMode === 1;
-    g.visible = visible;
-    if (!visible) return;
-
-    const car = carRef.current;
-    if (wheelRef.current) wheelRef.current.rotation.z = car.steerAng * 3.2;
-
-    const kmh = Math.abs(car.speed) * 3.6;
-    if (speedNeedle.current) speedNeedle.current.rotation.z = needleAngle(kmh / SPEEDO_MAX);
-
-    // no real RPM model — tach reads proportional to speed against the
-    // sedan's own top speed, same simplification the HUD's speedKmh already
-    // leans on for anything downstream of stepCarPhysics
-    const rpmFrac = 0.12 + Math.min(1, Math.abs(car.speed) / DEFAULT_HANDLING.max) * 0.82;
-    if (tachNeedle.current) tachNeedle.current.rotation.z = needleAngle(rpmFrac);
+    const cockpit = s.active === "car" && s.camMode === 1;
+    g.visible = cockpit;
+    // hide / restore the exterior body (our siblings under the car's RigidBody)
+    if (cockpit !== wasCockpit.current && g.parent) {
+      for (const c of g.parent.children) if (c !== g) c.visible = !cockpit;
+      wasCockpit.current = cockpit;
+    }
   });
 
   return (
-    <group ref={group}>
-      {/* the cabin sits under the roof, out of direct sun — without a local
-          fill it reads as a near-black silhouette against the bright exterior.
-          Real cars solve this with a dome light + backlit gauges; this is the
-          game equivalent, low enough not to wash out the dark trim. */}
-      <pointLight position={[0, 1.5, 0.4]} intensity={2.2} distance={3.6} decay={2} color="#fff4e0" />
-      <mesh position={[0, 1.1, 0.85]} material={DASH_MAT} castShadow>
-        <boxGeometry args={[1.6, 0.2, 0.5]} />
-      </mesh>
-      <Vent x={-0.55} />
-      <Vent x={0.55} />
-      <GaugeCluster speedNeedle={speedNeedle} tachNeedle={tachNeedle} />
-      <SteeringWheel wheelRef={wheelRef} />
-      <CenterConsole />
-      <PillarsAndFrame />
-      <Headliner />
-      <DoorPanel />
-      <RearviewMirror />
+    <group ref={group} visible={false}>
+      {/* BootHold: both cabins load + compile behind the loading screen */}
+      <Suspense fallback={<BootHold />}>
+        <Cabin key={def.id} kind={def.cockpit.interior} def={def} carRef={carRef} />
+        <PrewarmOtherCabin current={def.cockpit.interior} />
+      </Suspense>
     </group>
   );
+}
+
+/** keeps the other class's cabin loaded and its materials compiled (hidden) */
+function PrewarmOtherCabin({ current }: { current: InteriorKind }) {
+  const other: InteriorKind = current === "gt" ? "classic" : "gt";
+  const gltf = useGLTF(asset(INTERIORS[other]));
+  const obj = useMemo(() => {
+    const o = gltf.scene.clone(true);
+    o.visible = false;
+    return o;
+  }, [gltf]);
+  return <primitive object={obj} />;
 }

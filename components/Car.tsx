@@ -23,7 +23,8 @@ import { checkCrashDebris } from "@/lib/debris";
 import { consumePedestrianHitSlowdown } from "@/lib/pedestrianHit";
 import { SHORE_X, DROWN_RESPAWN, clampFromWater, isOnBridgeOrBase, groundYAt } from "@/lib/marina";
 import { SupercarBody, styleFor, RIDE_HEIGHT, type CarStyle, type Detail } from "@/components/SupercarBody";
-import { CarInterior } from "@/components/CarInterior";
+import { CarInterior, cockpitCameraArgs } from "@/components/CarInterior";
+import { usePlayerCarStore, PLAYER_CARS } from "@/lib/playerCar";
 import { QueryFilterFlags, type KinematicCharacterController } from "@dimforge/rapier3d-compat";
 import { tmpQuat, AXIS_Y } from "@/lib/scratch";
 
@@ -336,6 +337,8 @@ export function Car() {
       time: state.clock.elapsedTime,
       dt: d,
       speedMs: Math.abs(car.current.speed),
+      // cockpit eye = the current car's driver seat (lib/playerCar.ts cockpit.eye)
+      ...cockpitCameraArgs(PLAYER_CARS[usePlayerCarStore.getState().index]),
     });
 
     // true ground speed, not just the forward component — Math.abs(speed)

@@ -29,6 +29,15 @@ replaced by alpha blending, meshopt compression (46.8 MB → 1.53 MB). The modif
 **CC BY-NC-SA 4.0** license. Because of this asset, Toshkent Drive is a non-commercial
 project (free, no ads, no in-app purchases).
 
+## Cockpit interiors (v1.4, CC BY 4.0, Sketchfab)
+Rendered only in the cockpit camera. One shared cabin per car class; modified (props/glass removed,
+re-centred on the driver's eye, materials merged, decimated, meshopt-compressed) by
+`scripts/optimize-interiors.mjs`. The robot hands/arms on the wheel are procedural (no asset).
+| File | Model | Author | Used for | Source |
+|---|---|---|---|---|
+| models/interiors/gt-interior.glb | Autonomous GT Car Interior Design - Manual Mode | [benlockett](https://sketchfab.com/benlockett) | BMW M3 Competition, Kia K5, Kia Seltos | https://sketchfab.com/3d-models/autonomous-gt-car-interior-design-manual-mode-b4627fc6d22f45c496ed548ba3c9be10 |
+| models/interiors/sedan-interior.glb | Car interior | [Gerhald](https://sketchfab.com/Gerhald) | Chevrolet Lacetti, BMW M3 E30 | https://sketchfab.com/3d-models/car-interior-c5f830a811af4917972de8fa47949de9 |
+
 ## Traffic cars (all CC BY 4.0, Sketchfab)
 | File | Model | Author | Source |
 |---|---|---|---|
