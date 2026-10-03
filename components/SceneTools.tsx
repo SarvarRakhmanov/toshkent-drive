@@ -4,6 +4,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { useThree } from "@react-three/fiber";
 import { useRapier } from "@react-three/rapier";
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { getSunnyEnvMap } from "@/lib/skyEnv";
 import { useFrame } from "@/lib/safeFrame";
 import { isReady } from "@/lib/loadState";
@@ -50,6 +51,96 @@ export function Cull({ name, children, margin = 30 }: { name: string; children: 
     g.visible = d < (state.camera as THREE.PerspectiveCamera).far + margin;
   });
   return <group ref={ref} name={name}>{children}</group>;
+}
+
+/** v2.1 perf: bake a static set piece's meshes into one mesh per material.
+ *  Hand-built set pieces (Mizu mall + its parked cars) are hundreds of tiny
+ *  meshes — the mall alone was ~420 draw calls on phone LOW, 3x the budget,
+ *  whenever it was in view. Runs once after the loader finishes (programs are
+ *  already compiled; the merged meshes reuse the SAME material objects, so
+ *  night/emissive toggles keep working). Originals are hidden, not removed,
+ *  so React/R3F still own them. Text, instanced, skinned and multi-material
+ *  meshes are left alone. Only for subtrees with no per-frame animation. */
+function lookKey(m: THREE.Material): string {
+  const s = m as THREE.MeshPhysicalMaterial;
+  const id = (t: THREE.Texture | null | undefined) => (t ? t.uuid : "-");
+  return [m.type, s.color?.getHexString(), id(s.map), id(s.normalMap), id(s.roughnessMap), id(s.metalnessMap), id(s.aoMap), id(s.emissiveMap), id(s.alphaMap),
+    s.emissive?.getHexString(), s.emissiveIntensity?.toFixed(2), s.metalness?.toFixed(2), s.roughness?.toFixed(2), s.clearcoat?.toFixed(2), s.envMapIntensity?.toFixed(2), s.flatShading,
+    m.transparent, m.opacity.toFixed(2), m.side, m.alphaTest, m.depthWrite, m.depthTest, m.blending, m.toneMapped, (m as THREE.MeshBasicMaterial).fog, s.vertexColors].join("|");
+}
+
+/** byLook: also merge meshes whose (distinct) materials look identical — the
+ *  first material of the group is used, so only for subtrees whose materials
+ *  aren't animated individually (or whose animated ones look unique). */
+export function MergeStatic({ name, children, byLook = false }: { name: string; children: ReactNode; byLook?: boolean }) {
+  const ref = useRef<THREE.Group>(null);
+  const done = useRef(false);
+  const readyAt = useRef(-1);
+  useFrame((state) => {
+    const root = ref.current;
+    if (!root || done.current || !isReady()) return;
+    if (readyAt.current < 0) { readyAt.current = state.clock.elapsedTime; return; }
+    if (state.clock.elapsedTime - readyAt.current < 1) return; // let late Suspense children mount
+    done.current = true;
+    root.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+    const groups = new Map<THREE.Material | string, THREE.Mesh[]>();
+    root.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || !m.geometry || Array.isArray(m.material) || !m.visible) return;
+      if ((m as THREE.SkinnedMesh).isSkinnedMesh || (m as THREE.InstancedMesh).isInstancedMesh || m.morphTargetInfluences) return;
+      if ((m.geometry as THREE.InstancedBufferGeometry).isInstancedBufferGeometry) return; // troika Text
+      for (let p = m.parent; p && p !== root; p = p.parent) if (!p.visible || p.userData.noMerge) return;
+      const key = byLook ? lookKey(m.material) : m.material;
+      const list = groups.get(key) ?? [];
+      list.push(m);
+      groups.set(key, list);
+    });
+    const mtx = new THREE.Matrix4();
+    let before = 0, after = 0;
+    for (const list of groups.values()) {
+      const material = list[0].material as THREE.Material;
+      before += list.length;
+      if (list.length < 2) { after += list.length; continue; }
+      const names = ["position", "normal", "uv"].filter((a) => list.every((m) => m.geometry.getAttribute(a)));
+      if (!names.includes("position")) { after += list.length; continue; }
+      const geos = list.map((m) => {
+        const g = new THREE.BufferGeometry();
+        const src = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry;
+        for (const n of names) {
+          const a = src.getAttribute(n);
+          const out = new Float32Array(a.count * a.itemSize);
+          for (let i = 0; i < a.count; i++) for (let j = 0; j < a.itemSize; j++) out[i * a.itemSize + j] = a.getComponent(i, j);
+          g.setAttribute(n, new THREE.BufferAttribute(out, a.itemSize));
+        }
+        if (src !== m.geometry) src.dispose();
+        mtx.multiplyMatrices(inv, m.matrixWorld);
+        g.applyMatrix4(mtx);
+        if (mtx.determinant() < 0) {
+          for (const n of names) {
+            const a = g.getAttribute(n) as THREE.BufferAttribute, k = a.itemSize, arr = a.array as Float32Array;
+            for (let i = 0; i < a.count; i += 3) for (let j = 0; j < k; j++) { const t = arr[(i + 1) * k + j]; arr[(i + 1) * k + j] = arr[(i + 2) * k + j]; arr[(i + 2) * k + j] = t; }
+          }
+        }
+        return g;
+      });
+      const merged = mergeGeometries(geos, false);
+      geos.forEach((g) => g.dispose());
+      if (!merged) { after += list.length; continue; }
+      merged.computeBoundingSphere();
+      merged.computeBoundingBox();
+      const mesh = new THREE.Mesh(merged, material);
+      mesh.name = `merged:${material.name || "mat"}`;
+      mesh.castShadow = list.some((m) => m.castShadow);
+      mesh.receiveShadow = list.some((m) => m.receiveShadow);
+      mesh.renderOrder = list[0].renderOrder;
+      list.forEach((m) => { m.visible = false; });
+      root.add(mesh);
+      after++;
+    }
+    root.userData.merge = { before, after };
+  });
+  return <group ref={ref} name={`${name}-merged`}>{children}</group>;
 }
 
 /** Keeps camera.far just beyond the fog's far distance: anything past it is

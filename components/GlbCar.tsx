@@ -316,6 +316,12 @@ export function TrafficGlbCar({ index, color }: { index: number; color: string }
   const def = TRAFFIC_MODELS[Math.abs(index) % TRAFFIC_MODELS.length];
   const gltf = useGLTF(asset(def.url));
   const taxi = def.url.includes("taxi");
-  const obj = useMemo(() => prepare(gltf.scene, 0, def.length, undefined, taxi ? "#f2c200" : color, true, false), [gltf, def, color, taxi]);
+  const obj = useMemo(() => {
+    const o = prepare(gltf.scene, 0, def.length, undefined, taxi ? "#f2c200" : color, true, false);
+    // v2.1 perf: NPC cars have no wheel rig, so the whole body is static —
+    // merge per material look (a queue of 6 at a red light was ~50 calls)
+    mergeStaticBody(o, null);
+    return o;
+  }, [gltf, def, color, taxi]);
   return <primitive object={obj} />;
 }

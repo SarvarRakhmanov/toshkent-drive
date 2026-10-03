@@ -64,6 +64,25 @@ export function PerfProbe() {
       });
       return Object.entries(out).sort((a, b) => b[1] - a[1]).slice(0, 40);
     };
+    // per-object census under one named root: visible meshes grouped by the
+    // root's direct child index → [mesh count, material names]
+    (window as unknown as { __tdDrawIn: (name: string) => unknown }).__tdDrawIn = (name: string) => {
+      let root: THREE.Object3D | undefined;
+      scene.traverse((o) => { if (!root && o.name === name) root = o; });
+      if (!root) return null;
+      const res: [number, number, string][] = [];
+      root.children.forEach((c, i) => {
+        let n = 0; const mats = new Set<string>();
+        c.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (!m.isMesh) return;
+          for (let p: THREE.Object3D | null = o; p && p !== root; p = p.parent) if (!p.visible) return;
+          n++; mats.add(((Array.isArray(m.material) ? m.material[0] : m.material) as THREE.Material).type + ":" + (m.name || "?"));
+        });
+        if (n) res.push([i, n, [...mats].slice(0, 12).join(",")]);
+      });
+      return res;
+    };
     (window as unknown as { __tdPrograms: () => unknown }).__tdPrograms = () =>
       (gl.info.programs ?? []).map((p) => ({ id: p.id, name: p.name, key: (p as unknown as { cacheKey: string }).cacheKey }));
     (window as unknown as { __tdPerf: () => unknown }).__tdPerf = () => {
