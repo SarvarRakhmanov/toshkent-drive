@@ -257,8 +257,14 @@ export function Tank() {
       time: state.clock.elapsedTime,
       dt: d,
       speedMs: Math.abs(car.current.speed),
-      cockpitEyeHeight: 1.6,
-      cockpitForward: -0.1,
+      // v2.1: commander's head-out view from the turret hatch. The old 1.6 m
+      // eye sat INSIDE the turret (turret spans 1.2-2.6 m at TANK_SCALE), so
+      // the screen was all turret wall + the barrel from below. Hatch top is
+      // ~2.8 m; eye ~0.6 m above it, over the hatch (turret is 0.3*1.7 m aft).
+      cockpitEyeHeight: 3.4,
+      cockpitForward: 0,
+      cockpitAhead: -0.45,
+      cockpitLookDrop: 2.4,
       chaseDist: 11.5,
       chaseHeight: 5.0,
     });

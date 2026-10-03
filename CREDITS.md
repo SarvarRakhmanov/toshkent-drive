@@ -106,7 +106,8 @@ Pitch follows the simulated engine RPM (firing frequency rpm/60 × cylinders/2).
 ## Cockpit interiors (v1.6)
 | File | Source model | Author | License | Source | Used for |
 |---|---|---|---|---|---|
-| models/interiors/sedan2-interior.glb | 2014 Toyota Corolla E180 EU (with interior) | armoredwave | CC BY 4.0, **modified** (cabin only, decimated 84k → 28.5k tris, textures 256 px WebP, steering wheel split + re-pivoted) | https://sketchfab.com/3d-models/2014-toyota-corolla-e180-eu-with-interior-36f95efb0585464cae43a25a3b3392e8 | sedans: Lacetti, K5, M3 E30 |
-| models/interiors/suv-interior.glb | 2019 Skoda Karoq | BHP3D | CC BY 4.0, **modified** (cabin only, decimated 186k → 31k tris, textures 256 px WebP, steering wheel cut out of the dash mesh + re-pivoted) | https://sketchfab.com/3d-models/2019-skoda-karoq-7e359874ebe744158eddc37c9da8f487 | SUV / modern: Seltos, M3 Competition |
+| models/interiors/sedan2-interior.glb | 2014 Toyota Corolla E180 EU (with interior) | armoredwave | CC BY 4.0, **modified** (cabin only, decimated 84k → 28.5k tris, textures 256 px WebP, steering wheel split + re-pivoted) | https://sketchfab.com/3d-models/2014-toyota-corolla-e180-eu-with-interior-36f95efb0585464cae43a25a3b3392e8 | sedans: Lacetti, K5 |
+| models/interiors/suv-interior.glb | 2019 Skoda Karoq | BHP3D | CC BY 4.0, **modified** (cabin only, decimated 186k → 31k tris, textures 256 px WebP, steering wheel cut out of the dash mesh + re-pivoted) | https://sketchfab.com/3d-models/2019-skoda-karoq-7e359874ebe744158eddc37c9da8f487 | SUV / modern: Seltos |
+| models/interiors/sport-interior.glb | 2021 BMW M4 Competition | Ricy ([ngon_3d](https://sketchfab.com/ngon_3d)) | [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) (license verified on the Sketchfab API 2026-10-04), **modified** (cabin only — body, glass, doors, wheels dropped; decimated 117k → 28.8k tris, textures 256 px WebP, M steering wheel re-pivoted) | https://sketchfab.com/3d-models/2021-bmw-m4-competition-d3f07b471d9f4a2c9a2acf79d88a3645 | sports cockpit (v2.1): BMW M3 Competition, BMW M3 E30 |
 
 The driver's gloved hands and sleeves are procedural (components/CarInterior.tsx).

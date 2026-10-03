@@ -53,6 +53,15 @@ const JOBS = [
     drop: /glass|^wheel|primary|^body|boot|door_ok|light|plate|grill/i,
     wheel: { triBox: [[-0.62, 0.84, -0.56], [-0.14, 1.37, -0.2]], cyl: { hub: [-0.392, 1.127, -0.393], n: [-0.085, 0.426, 0.901], r: 0.2, back: 0.045, front: 0.1 }, nodes: /panel|interior/, rim: 0.18 },
   },
+  {
+    // v2.1 sports cabin for both M3s: "2021 BMW M4 Competition" by ngon_3d
+    // (CC BY-NC, G82 M4 = same cabin as the G80 M3) — M bucket seats, M wheel
+    src: "new/m4-ngon.glb", out: "interiors/sport-interior.glb", budget: 30000,
+    eye: [0.53, 1.56, -0.12], scale: 0.725, rotY: 0,
+    keep: [[-1.5, 0.25, -2.7], [1.5, 2.0, 1.75]],
+    drop: /glass|tire|rim|brake|skirt|grille|bumper|sunvisor|plane003|body|headlight|glsslight|tail|exhaust|logo|plate|fgrll|spoiler|rooffin|cylinder|diffuser|bottom|laseralum|rear_seat|rearseat|driver_door|passenger_door/i,
+    wheel: { name: /steering wheel/i },
+  },
 ];
 
 // v1.6: move the triangles fully inside `box` (source/world space) out of

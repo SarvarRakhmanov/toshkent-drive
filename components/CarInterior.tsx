@@ -36,17 +36,18 @@ const INTERIORS = {
   classic: "/models/interiors/sedan-interior.glb",
   sedan: "/models/interiors/sedan2-interior.glb", // Toyota Corolla E180 cabin
   suv: "/models/interiors/suv-interior.glb", // Skoda Karoq cabin (digital cluster)
+  sport: "/models/interiors/sport-interior.glb", // v2.1 BMW M4 Competition cabin (both M3s)
 } as const;
-const IN_USE: InteriorKind[] = ["sedan", "suv"];
+const IN_USE: InteriorKind[] = ["sedan", "suv", "sport"];
 // [forward, up] cabin offset (m) relative to the car's eye point
-const SEAT_BACK: Record<InteriorKind, [number, number]> = { gt: [0, 0], classic: [0, 0], sedan: [0.08, 0.0], suv: [0.14, -0.02] };
+const SEAT_BACK: Record<InteriorKind, [number, number]> = { gt: [0, 0], classic: [0, 0], sedan: [0.08, 0.0], suv: [0.14, -0.02], sport: [0.16, 0.0] };
 type InteriorKind = keyof typeof INTERIORS;
 
 /** cameraRig args for the current player car's cockpit (local car frame). */
 export function cockpitCameraArgs(def: PlayerCarDef) {
   const [x, y, z] = def.cockpit.eye;
   // look-at drop 30 m ahead: the GT cabin's wheel sits lower, so pitch down more to keep wheel + hands in view
-  const drop = { gt: 4.2, classic: 2.2, sedan: 2.6, suv: 3.0 }[def.cockpit.interior];
+  const drop = { gt: 4.2, classic: 2.2, sedan: 2.6, suv: 3.0, sport: 3.3 }[def.cockpit.interior];
   return { cockpitForward: x, cockpitEyeHeight: y - RIDE_HEIGHT, cockpitAhead: z, cockpitLookDrop: drop };
 }
 
