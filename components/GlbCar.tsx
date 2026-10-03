@@ -16,12 +16,14 @@ import { coatScene } from "@/lib/weatherCoat";
 
 function fitCar(model: THREE.Object3D, length: number) {
   model.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(model);
+  // precise = from the actual vertices: the loader's cached geometry bounds
+  // were too small for some models (K5 sat 17 cm, M3 Competition 29 cm in the road)
+  const box = new THREE.Box3().setFromObject(model, true);
   const size = box.getSize(new THREE.Vector3());
   const span = Math.max(size.x, size.z, 0.01);
   model.scale.multiplyScalar(length / span);
   model.updateMatrixWorld(true);
-  const fitted = new THREE.Box3().setFromObject(model);
+  const fitted = new THREE.Box3().setFromObject(model, true);
   const c = fitted.getCenter(new THREE.Vector3());
   model.position.x -= c.x;
   model.position.z -= c.z;
@@ -90,7 +92,10 @@ function prepare(scene: THREE.Object3D, rotY: number, length: number, paint: Reg
     });
     mesh.material = tinted.length === 1 ? tinted[0] : tinted;
   }
-  wrap.position.y = -RIDE_HEIGHT;
+  // fitCar already lifted the wrap so the lowest vertex (tyre) touches y=0;
+  // ADD the ride-height offset instead of overwriting that lift (the old "="
+  // sank any model whose origin isn't at tyre level: K5 17 cm, M3 Comp. 29 cm)
+  wrap.position.y -= RIDE_HEIGHT;
   // weather-coat shader patch right away: otherwise the car first compiles an
   // uncoated program and recompiles ~2 s later when Weather's scan coats it
   coatScene(wrap);
@@ -164,18 +169,20 @@ function addPlates(wrap: THREE.Object3D, plate: NonNullable<PlayerCarDef["plate"
     p.addScaledVector(n, 0.012 + 0.055 * tilt);
     const m = new THREE.Mesh(PLATE_GEO, mat);
     m.name = "td-plate";
-    m.position.copy(p);
-    m.lookAt(p.clone().add(n)); // plane's front (+z) faces out along the normal
+    // p/n are world-space (wrap is an unrotated root here); store in wrap space
     wrap.add(m);
+    m.position.copy(wrap.worldToLocal(p.clone()));
+    m.lookAt(p.clone().add(n)); // lookAt takes a world target; front (+z) faces out
   }
 }
 
 function preparePlayer(def: PlayerCarDef, scene: THREE.Object3D) {
   const obj = prepare(scene, def.rotY, def.length, def.paint, def.color, false, true);
+  obj.name = `td-car:${def.id}`;
   if (def.plate) {
-    obj.position.y = 0; // addPlates works in ground-relative wrap space
+    obj.position.y += RIDE_HEIGHT; // addPlates raycasts with the road at world y=0
     addPlates(obj, def.plate);
-    obj.position.y = -RIDE_HEIGHT;
+    obj.position.y -= RIDE_HEIGHT;
   }
   return obj;
 }

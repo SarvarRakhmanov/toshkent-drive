@@ -16,6 +16,30 @@ export function PerfProbe() {
   const { gl, scene } = useThree();
   useEffect(() => {
     gl.info.autoReset = false;
+    // world-space bounds of a named object (tests: wheels-on-ground check)
+    (window as unknown as { __tdBox: (n: string) => unknown }).__tdBox = (name: string) => {
+      let found: THREE.Object3D | undefined;
+      scene.traverse((o) => { if (!found && o.name === name && o.visible) found = o; });
+      if (!found) return null;
+      found.updateWorldMatrix(true, true);
+      const b = new THREE.Box3().setFromObject(found, true);
+      const p = new THREE.Vector3(); found.parent?.getWorldPosition(p);
+      return { min: b.min.toArray(), max: b.max.toArray(), parentY: p.y };
+    };
+    (window as unknown as { __tdLowest: (n: string) => unknown }).__tdLowest = (name: string) => {
+      let root: THREE.Object3D | undefined;
+      scene.traverse((o) => { if (!root && o.name === name && o.visible) root = o; });
+      if (!root) return null;
+      root.updateWorldMatrix(true, true);
+      const out: { name: string; skinned: boolean; minY: number; visible: boolean; mat: string }[] = [];
+      root.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        const b = new THREE.Box3().setFromObject(m, true);
+        out.push({ name: m.name, skinned: !!(m as THREE.SkinnedMesh).isSkinnedMesh, minY: +b.min.y.toFixed(3), visible: m.visible, mat: ((Array.isArray(m.material) ? m.material[0] : m.material) as THREE.Material).name });
+      });
+      return out.sort((a, b) => a.minY - b.minY).slice(0, 6);
+    };
     (window as unknown as { __tdPrograms: () => unknown }).__tdPrograms = () =>
       (gl.info.programs ?? []).map((p) => ({ id: p.id, name: p.name, key: (p as unknown as { cacheKey: string }).cacheKey }));
     (window as unknown as { __tdPerf: () => unknown }).__tdPerf = () => {

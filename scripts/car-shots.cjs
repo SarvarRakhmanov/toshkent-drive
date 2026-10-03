@@ -20,7 +20,7 @@ const CARS = (process.env.CARS || "0,1,4").split(",").map(Number);
     await page.waitForTimeout(3000);
     const progs0 = await page.evaluate(() => window.__tdPerf().programs);
     await page.screenshot({ path: `${OUT}/car-${car}-rear.png`, timeout: 180000 });
-    await page.evaluate((y) => window.__td.look(y, 0.05), Number(process.env.YAW || Math.PI * 0.82));
+    await page.evaluate((y) => window.__td.look(y[0], y[1]), [Number(process.env.YAW || Math.PI * 0.82), Number(process.env.PITCH || 0.05)]);
     await page.waitForTimeout(6000);
     await page.screenshot({ path: `${OUT}/car-${car}-front.png`, timeout: 180000 });
     const progs1 = await page.evaluate(() => window.__tdPerf().programs);
