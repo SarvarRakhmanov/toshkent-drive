@@ -47,6 +47,19 @@ Modified: scaled to human height (1.85 m), textures 512 px WebP, meshopt compres
 (4.6 MB → 0.29 MB, 8,229 triangles). The model has no rig or animations, so the game cuts
 its legs and arms apart at load time and swings them procedurally (walk / jump / sit).
 
+## Pedestrian robots (v1.4, CC BY 4.0, Sketchfab — from EveBatStudios' "Robot downloads" collection)
+Each posed at a standing frame, skin baked to static geometry, materials merged, decimated
+(plus a distance LOD), textures 256 px WebP (64 px for the LOD), meshopt-compressed by
+`scripts/optimize-robots.mjs`; drawn instanced with a procedural bob/sway.
+| File | Model | Author | Source |
+|---|---|---|---|
+| models/robots/npc-militor*.glb | Militor Mechanoid | [Lagst](https://sketchfab.com/Lagst) | https://sketchfab.com/3d-models/militor-mechanoid-e70e3e81dc8c43c6a7c6ed5e6a8c4c86 |
+| models/robots/npc-checkered-guard*.glb | Checkered Guard (police officers) | [Lagst](https://sketchfab.com/Lagst) | https://sketchfab.com/3d-models/checkered-guard-4ee6292ee3554d8daccd81a9c678e31a |
+| models/robots/npc-mini-bot*.glb | Mini-bot | [lorib2306](https://sketchfab.com/lorib2306) | https://sketchfab.com/3d-models/mini-bot-116dc9f062204c09b109bf245e3c5273 |
+| models/robots/npc-ww1*.glb | WW1 french robot solider | [bovos5](https://sketchfab.com/bovos5) | https://sketchfab.com/3d-models/ww1-french-robot-solider-dbaaf294eb104e8c88c6e4a1fb2a2402 |
+| models/robots/npc-biped*.glb | Biped robot | [Willy Decarpentrie (skudgee)](https://sketchfab.com/skudgee) | https://sketchfab.com/3d-models/biped-robot-801d2a245e4a4405a0c2152b35b5e486 |
+| models/robots/npc-bumstrum*.glb | Robot | [DJMaesen (bumstrum)](https://sketchfab.com/bumstrum) | https://sketchfab.com/3d-models/robot-93c9ff1cac014cc382e8666c873cdd70 |
+
 ## Traffic cars (all CC BY 4.0, Sketchfab)
 | File | Model | Author | Source |
 |---|---|---|---|

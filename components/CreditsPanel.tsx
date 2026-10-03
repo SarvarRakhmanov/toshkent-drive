@@ -39,6 +39,11 @@ export function CreditsPanel() {
         Player robot: <b>The Big Boss</b> by FrazierChristopher (Sketchfab, CC BY 4.0, modified).
       </p>
       <p>
+        Pedestrian robots: <b>Militor Mechanoid</b> and <b>Checkered Guard</b> by Lagst,{" "}
+        <b>Mini-bot</b> by lorib2306, <b>WW1 french robot solider</b> by bovos5,{" "}
+        <b>Biped robot</b> by skudgee, <b>Robot</b> by bumstrum (Sketchfab, CC BY 4.0, modified).
+      </p>
+      <p>
         Traffic cars by DanielZhabotinsky and roh3d. Buildings by cn-entertainment, MrAeterna,
         bral_unit, Lost_Gecko and Colin.Greenall (Sketchfab, CC BY 4.0). Sky HDRI and tree
         textures from Poly Haven (CC0).

@@ -299,7 +299,7 @@ export default function Game() {
                 (components/ReadyGate.tsx), then every shader is pre-compiled */}
             <Deferred stage={1}>
               <group name="Traffic"><Traffic /></group>
-              <group name="Pedestrians"><Pedestrians /></group>
+              <group name="Pedestrians"><Suspense fallback={<BootHold />}><Pedestrians /></Suspense></group>
               <Player />
             </Deferred>
             <Deferred stage={2}>

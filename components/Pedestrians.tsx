@@ -1,12 +1,12 @@
 "use client";
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@/lib/safeFrame";
 import * as THREE from "three";
 import { worldState } from "@/lib/worldState";
 import { useHudStore } from "@/lib/hudStore";
 import { SHORE_X } from "@/lib/marina";
-import { PersonFigure, PERSON_MODEL_HEIGHT } from "@/components/PersonFigure";
+import { NPC_ROBOTS, useNpcRobots } from "@/components/RobotModels";
 import { AIRPORT_CHUNKS } from "@/components/City";
 import { requestPedestrianHitSlowdown } from "@/lib/pedestrianHit";
 
@@ -25,8 +25,14 @@ const HALF_SIDE = 36; // original's `hs` — half the walking loop's square side
 const SIDE = HALF_SIDE * 2;
 const LOOP_LEN = SIDE * 4; // 288, matches the original's literal `per`
 
-const TARGET_HEIGHT = 1.8;
-const SCALE = TARGET_HEIGHT / PERSON_MODEL_HEIGHT;
+// v1.4: pedestrians are robots (components/RobotModels.tsx) drawn as one
+// InstancedMesh per robot type / LOD / material — ~22 draw calls for all of
+// them instead of ~15 per box person. Full detail (~5k tris) inside NEAR_DIST,
+// a ~1.6-2.8k LOD out to FAR_DIST, nothing beyond (they're specks by then).
+const NEAR_DIST2 = 32 * 32;
+const FAR_DIST2 = 150 * 150;
+const OFFICER_ROBOT = NPC_ROBOTS.findIndex((r) => r.id === "checkered-guard");
+const CIVILIAN_ROBOTS = NPC_ROBOTS.map((_, i) => i).filter((i) => i !== OFFICER_ROBOT);
 
 const CIVILIAN_COUNT = 44;
 const OFFICER_COUNT = 7;
@@ -38,10 +44,6 @@ const HIT_RADIUS2 = 8 * 8; // original's cheap far-reject before the oriented-bo
 // every player-drivable land vehicle — was missing jeep/bus/truck/policeJeep
 // entirely, so running a pedestrian over in one of those silently no-opped
 const LAND_VEHICLES = new Set(["car", "bike", "policeCar", "jeep", "bus", "truck", "policeJeep"]);
-
-const SKINS = ["#d9a066", "#8a5a2b", "#f0c8a0", "#6b4423", "#c79a6b", "#a06a3a"];
-const SHIRTS = ["#c84f4f", "#4f7ac8", "#4fc87a", "#c8b44f", "#9a4fc8", "#e8e8e8", "#2a2e38", "#d98a3a", "#2f8a6a"];
-const PANTS = ["#23262e", "#2a2a3a", "#4a3a2a", "#1a1a22", "#3a4a5a", "#5a5a5a"];
 
 function mulberry32(seed: number) {
   return function () {
@@ -56,9 +58,7 @@ function mulberry32(seed: number) {
 const rand = mulberry32(7);
 
 interface PedSpec {
-  skin: string;
-  shirt: string;
-  pants: string;
+  robot: number;
   officer: boolean;
   dir: 1 | -1;
   baseSpeed: number;
@@ -103,9 +103,7 @@ function makeSpec(officer: boolean): PedSpec {
     () => Math.floor(rand() * 7) - 3
   );
   return {
-    skin: SKINS[(rand() * SKINS.length) | 0],
-    shirt: officer ? "#1c2c4e" : SHIRTS[(rand() * SHIRTS.length) | 0],
-    pants: officer ? "#131a2b" : PANTS[(rand() * PANTS.length) | 0],
+    robot: officer ? OFFICER_ROBOT : CIVILIAN_ROBOTS[(rand() * CIVILIAN_ROBOTS.length) | 0],
     officer,
     dir: rand() < 0.5 ? 1 : -1,
     baseSpeed: officer ? 1.2 + rand() * 0.8 : 1.3 + rand() * 1.3,
@@ -125,7 +123,7 @@ const PED_SPECS: PedSpec[] = [
 // laneBlocked() so AI traffic actually brakes for someone standing in the
 // road instead of clipping straight through them (that hit-test above only
 // ever covered the PLAYER's own driven vehicle, never scripted lane cars).
-export const pedestrianPositions: { x: number; z: number }[] = PED_SPECS.map(() => ({ x: 0, z: 0 }));
+export const pedestrianPositions: { x: number; z: number; h: number; robot: number }[] = PED_SPECS.map((p) => ({ x: 0, z: 0, h: 0, robot: p.robot }));
 
 // Walks the 72m perimeter of a block centred at (cx,cz) — ported verbatim
 // from the original's pedPos(): four straight sides, s wraps mod 288.
@@ -139,30 +137,29 @@ function pedPos(cx: number, cz: number, s: number): [number, number, number, num
   return [cx - HALF_SIDE, cz + HALF_SIDE - u, 0, -1];
 }
 
-function Ped({ spec, index }: { spec: PedSpec; index: number }) {
-  const group = useRef<THREE.Group>(null);
-  const legL = useRef<THREE.Mesh>(null);
-  const legR = useRef<THREE.Mesh>(null);
-  const armL = useRef<THREE.Mesh>(null);
-  const armR = useRef<THREE.Mesh>(null);
-  const st = useRef({
-    cx: spec.ci * CELL,
-    cz: spec.cj * CELL,
-    s: spec.s,
-    dir: spec.dir,
-    flee: 0,
-    rag: null as Ragdoll | null,
-  });
+interface PedState {
+  cx: number;
+  cz: number;
+  s: number;
+  dir: 1 | -1;
+  flee: number;
+  rag: Ragdoll | null;
+  bob: number;
+  sway: number;
+}
 
-  useFrame((frameState, dt) => {
-    const g = group.current;
-    if (!g) return;
+// Same per-pedestrian logic as before the robot swap (walk loop, flee,
+// rehome, car hit + ragdoll) — `g` is now a bare transform holder that the
+// instancer below copies into InstancedMesh matrices.
+function stepPed(g: THREE.Object3D, spec: PedSpec, ps: PedState, index: number, t: number, dt: number) {
     const d = Math.min(dt, 0.05);
-    const ps = st.current;
+    ps.bob = 0;
+    ps.sway = 0;
     // one-frame-stale is fine for a coarse "is anyone standing here" obstacle
     // check — written before this frame's own movement below
     pedestrianPositions[index].x = g.position.x;
     pedestrianPositions[index].z = g.position.z;
+    pedestrianPositions[index].h = g.rotation.y;
 
     // ----- ragdoll: tumble, bounce off the tarmac, settle, then rejoin -----
     if (ps.rag) {
@@ -270,36 +267,67 @@ function Ped({ spec, index }: { spec: PedSpec; index: number }) {
     g.position.set(x, 0, z);
     g.rotation.y = Math.atan2(fx * ps.dir, fz * ps.dir);
 
-    const t = frameState.clock.elapsedTime;
-    const sw = Math.sin(t * (ps.flee > 0 ? 16 : 8) + ps.s) * 0.55;
-    if (legL.current) legL.current.rotation.x = sw;
-    if (legR.current) legR.current.rotation.x = -sw;
-    if (armL.current) armL.current.rotation.x = -sw * 0.8;
-    if (armR.current) armR.current.rotation.x = sw * 0.8;
-  });
-
-  return (
-    <group ref={group} scale={SCALE}>
-      <PersonFigure
-        legL={legL}
-        legR={legR}
-        armL={armL}
-        armR={armR}
-        jacketColor={spec.shirt}
-        pantsColor={spec.pants}
-        skinColor={spec.skin}
-        officer={spec.officer}
-      />
-    </group>
-  );
+    // rigid robots: procedural footstep bob + side-to-side roll
+    const ph = t * (ps.flee > 0 ? 16 : 8) + ps.s;
+    ps.bob = Math.abs(Math.sin(ph)) * (ps.flee > 0 ? 0.08 : 0.045);
+    ps.sway = Math.sin(ph) * (ps.flee > 0 ? 0.09 : 0.05);
 }
 
 export function Pedestrians() {
-  return (
-    <>
-      {PED_SPECS.map((spec, i) => (
-        <Ped key={i} spec={spec} index={i} />
-      ))}
-    </>
+  return <PedestrianRobots />;
+}
+
+function PedestrianRobots() {
+  const robots = useNpcRobots();
+  const holders = useMemo(() => PED_SPECS.map(() => new THREE.Object3D()), []);
+  const states = useRef<PedState[]>(
+    PED_SPECS.map((spec) => ({ cx: spec.ci * CELL, cz: spec.cj * CELL, s: spec.s, dir: spec.dir, flee: 0, rag: null, bob: 0, sway: 0 }))
   );
+  // one InstancedMesh per [robot type][lod][part], sized to that type's head count
+  const { root, meshes } = useMemo(() => {
+    const root = new THREE.Group();
+    root.name = "pedestrian-robots";
+    const perType = NPC_ROBOTS.map((_, ti) => PED_SPECS.filter((p) => p.robot === ti).length);
+    const meshes = robots.map((lods, ti) =>
+      lods.map((parts, lod) =>
+        parts.map((p) => {
+          const im = new THREE.InstancedMesh(p.geometry, p.material, Math.max(1, perType[ti]));
+          im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+          im.count = 0;
+          im.frustumCulled = false; // all instances share one buffer; bounds would need a per-frame recompute
+          im.castShadow = lod === 0;
+          im.name = `ped:${NPC_ROBOTS[ti].id}:${lod}`;
+          root.add(im);
+          return im;
+        })
+      )
+    );
+    return { root, meshes };
+  }, [robots]);
+  const tmp = useMemo(() => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler(), p: new THREE.Vector3(), one: new THREE.Vector3(1, 1, 1) }), []);
+
+  useFrame((frameState, dt) => {
+    const t = frameState.clock.elapsedTime;
+    for (const lods of meshes) for (const parts of lods) for (const im of parts) im.count = 0;
+    for (let i = 0; i < PED_SPECS.length; i++) {
+      const g = holders[i];
+      const spec = PED_SPECS[i];
+      const ps = states.current[i];
+      stepPed(g, spec, ps, i, t, dt);
+      const dx = g.position.x - worldState.px;
+      const dz = g.position.z - worldState.pz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > FAR_DIST2) continue;
+      const lod = d2 < NEAR_DIST2 ? 0 : 1;
+      tmp.e.set(g.rotation.x, g.rotation.y, g.rotation.z + ps.sway, g.rotation.order);
+      tmp.q.setFromEuler(tmp.e);
+      tmp.p.set(g.position.x, g.position.y + ps.bob, g.position.z);
+      tmp.m.compose(tmp.p, tmp.q, tmp.one);
+      for (const im of meshes[spec.robot][lod]) im.setMatrixAt(im.count++, tmp.m);
+    }
+    // an empty InstancedMesh still costs a draw call (and a shadow-pass one): hide it
+    for (const lods of meshes) for (const parts of lods) for (const im of parts) { im.visible = im.count > 0; if (im.count) im.instanceMatrix.needsUpdate = true; }
+  });
+
+  return <primitive object={root} />;
 }
