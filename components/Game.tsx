@@ -81,6 +81,7 @@ import { CommercialVehicle } from "@/components/CommercialVehicle";
 import { LIVERIES } from "@/components/Airliner";
 import { Props } from "@/components/Props";
 import { TashkentLandmarks } from "@/components/TashkentLandmarks";
+import { Skyline } from "@/components/Skyline";
 import { Headlights } from "@/components/Headlights";
 import { MouseLook } from "@/components/MouseLook";
 import { Highway } from "@/components/Highway";
@@ -333,6 +334,7 @@ export default function Game() {
           <AutoQuality />
           <DprSync />
           <SkyCycle />
+          <Skyline />
           <FogFarSync />
           <LightPool count={prof.pointLights} />
           {/* image lighting: HDR on HIGH (own Suspense so the 1.4 MB file never
