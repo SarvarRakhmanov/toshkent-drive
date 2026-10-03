@@ -83,16 +83,22 @@ export function LowEnvironment() {
   return null;
 }
 
+// One-way per page load (v1.5): AutoQuality only ever steps DOWN, and changes
+// the quality TIER (a canvas remount) at most once; if the player puts HIGH
+// back on afterwards it is left alone — no HIGH↔LOW ping-pong.
+let tierDropsThisPage = 0;
+
 /** Automatic quality drop: if the frame rate stays under ~30 FPS for ~6 s of
- *  play, HIGH drops to LOW; on LOW the pixel ratio steps down (0.85, 0.7).
+ *  play, HIGH first goes to safe HIGH (lower pixel ratio, no AO — no remount),
+ *  then to LOW (once per page); on LOW the pixel ratio steps down (0.85, 0.7).
  *  Disabled with ?autoq=0 (benchmarks). */
 export function AutoQuality() {
-  const acc = useRef({ t: 0, n: 0, bad: 0, cooldown: 4 });
+  const acc = useRef({ t: 0, n: 0, bad: 0, cooldown: 10 });
   const disabled = typeof window !== "undefined" && /[?&]autoq=0/.test(window.location.search);
   useFrame((_, dt) => {
     if (disabled || !isReady() || document.hidden) return;
     const a = acc.current;
-    if (a.cooldown > 0) { a.cooldown -= dt; return; }
+    if (a.cooldown > 0) { a.cooldown -= Math.min(dt, 0.25); return; }
     a.t += dt; a.n++;
     if (a.t < 2) return;
     const fps = a.n / a.t;
@@ -100,13 +106,17 @@ export function AutoQuality() {
     a.bad = fps < 30 ? a.bad + 1 : Math.max(0, a.bad - 1);
     if (a.bad < 3) return;
     a.bad = 0;
-    a.cooldown = 8;
+    a.cooldown = 10;
     const g = useGfxStore.getState();
-    if (g.quality === "high") {
+    if (g.quality === "high" && !g.safe) {
+      g.setSafe(true);
+      useHudStore.getState().showMsg("GRAPHICS: HIGH (lighter, auto)");
+    } else if (g.quality === "high" && tierDropsThisPage === 0) {
+      tierDropsThisPage++;
       saveGame();
       g.setQuality("low");
       useHudStore.getState().showMsg("GRAPHICS: LOW (auto, for smoother play)");
-    } else if (g.dprScale > 0.72) {
+    } else if (g.quality === "low" && g.dprScale > 0.72) {
       g.setDprScale(g.dprScale > 0.9 ? 0.85 : 0.7);
     }
   });
@@ -117,9 +127,10 @@ export function AutoQuality() {
 export function DprSync() {
   const setDpr = useThree((s) => s.setDpr);
   const dprScale = useGfxStore((s) => s.dprScale);
+  const safe = useGfxStore((s) => s.safe);
   useEffect(() => {
     setDpr(currentProfile().dpr);
-  }, [dprScale, setDpr]);
+  }, [dprScale, safe, setDpr]);
   return null;
 }
 

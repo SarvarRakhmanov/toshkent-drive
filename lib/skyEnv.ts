@@ -7,10 +7,15 @@ import * as THREE from "three";
 // metalness>0 material, no per-material wiring needed once this is set.
 // Baked once and cached; PMREMGenerator is a real render pass so this must
 // run lazily (needs a renderer) rather than at module load.
+// per renderer: after a canvas remount the old render target belongs to a dead
+// GL context (empty in the new one) — rebuild it and free the old one
 let cached: THREE.Texture | null = null;
+let cachedFor: THREE.WebGLRenderer | null = null;
 
 export function getSunnyEnvMap(gl: THREE.WebGLRenderer): THREE.Texture {
-  if (cached) return cached;
+  if (cached && cachedFor === gl) return cached;
+  if (cached) { cached.dispose(); cached = null; }
+  cachedFor = gl;
   const pmrem = new THREE.PMREMGenerator(gl);
   pmrem.compileEquirectangularShader();
 

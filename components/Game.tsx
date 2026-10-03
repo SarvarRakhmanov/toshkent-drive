@@ -14,7 +14,7 @@
 import "@/lib/consoleFilter";
 import "@/lib/physicsGuard";
 import "@/lib/testHooks";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import type * as THREE from "three";
 import { useFrame } from "@/lib/safeFrame";
@@ -44,7 +44,10 @@ import { Debris } from "@/components/Debris";
 import { WaypointTracker } from "@/components/WaypointTracker";
 import { HUD } from "@/components/HUD";
 import { PrewarmAssets } from "@/components/GlbCar";
-import { useGfxStore, profileFor } from "@/lib/gfx";
+import { useGfxStore, profileFor, markGfxRunning, markGfxStopped, takeBootNotice } from "@/lib/gfx";
+
+// hard cap on canvas remounts per page load (context loss / watchdog)
+const MAX_REMOUNTS = 3;
 import { LightPool } from "@/components/LightPool";
 import { Deferred } from "@/components/Deferred";
 import { ReadyGate, BootHold } from "@/components/ReadyGate";
@@ -91,12 +94,37 @@ const BOOT_STAGES = 6;
 
 // original's exact per-frame rescale (updateDayNight ~line 7016): dim by day
 // so daylight isn't blown out, full glow at night for the neon signs
-function DynamicBloom() {
+// memo: the postprocessing wrapper JSON.stringify()s an effect's props on every
+// render — with the ref (React 19: a plain prop) pointing at a live BloomEffect
+// that throws "Converting circular structure". Never re-render it from Game.
+const DynamicBloom = memo(function DynamicBloom() {
   const ref = useRef<BloomEffect>(null);
   useFrame(() => {
     if (ref.current) ref.current.intensity = 0.18 + skyState.nightK * 0.72;
   });
   return <Bloom ref={ref} luminanceThreshold={0.7} luminanceSmoothing={0.2} mipmapBlur />;
+});
+
+/** Crash sentinel (lib/gfx.ts): set while rendering, cleared on a clean exit
+ *  or after a stable minute; shows the boot-time downgrade message. Its own
+ *  component so the load-phase subscription never re-renders Game (a Game
+ *  re-render re-renders the postprocessing effects, whose wrapper
+ *  JSON.stringify()s their props — Bloom's ref then throws "circular"). */
+function CrashSentinel() {
+  const phase = useLoadStore((s) => s.phase);
+  useEffect(() => {
+    if (phase !== "ready") return;
+    markGfxRunning();
+    const notice = takeBootNotice();
+    if (notice) useHudStore.getState().showMsg(notice);
+    const stable = window.setTimeout(() => markGfxStopped(true), 60000);
+    const bye = () => markGfxStopped(false);
+    const back = () => { if (document.visibilityState === "visible") markGfxRunning(); };
+    window.addEventListener("pagehide", bye);
+    document.addEventListener("visibilitychange", back);
+    return () => { window.clearTimeout(stable); window.removeEventListener("pagehide", bye); document.removeEventListener("visibilitychange", back); };
+  }, [phase]);
+  return null;
 }
 
 export default function Game() {
@@ -191,44 +219,79 @@ export default function Game() {
 
   // quality tier (and the auto-quality pixel-ratio step) → one profile object
   const dprScale = useGfxStore((s) => s.dprScale);
-  const prof = profileFor(quality, dprScale);
+  const safe = useGfxStore((s) => s.safe);
+  const prof = profileFor(quality, dprScale, safe);
   // a lost WebGL context (iOS/Android under memory pressure) used to leave a
   // frozen canvas forever; remount the Canvas when the browser restores it
   const [ctxKey, setCtxKey] = useState(0);
+  const canvasKey = `${quality}:${ctxKey}`;
+  // The key of the Canvas that is mounted RIGHT NOW. R3F force-loses the old
+  // canvas' context when it unmounts it (quality switch, remount): that
+  // "webglcontextlost" must not count — before v1.5 it scheduled another
+  // remount, which force-lost that canvas too… an endless reload loop.
+  const liveKey = useRef(canvasKey);
+  // layout effect: updated in the commit, before R3F's deferred unmount of the old canvas
+  useLayoutEffect(() => { liveKey.current = canvasKey; }, [canvasKey]);
+  const glRef = useRef<THREE.WebGLRenderer | null>(null);
+
+  // Crash guard: one real GPU problem (context lost, or the render loop wedged)
+  // -> safe HIGH; a second one -> LOW. Never a page reload, and at most
+  // MAX_REMOUNTS canvas remounts per page so nothing can loop.
+  const gpuTrouble = useRef(0);
+  const remounts = useRef(0);
+  const recover = useCallback((why: string) => {
+    gpuTrouble.current++;
+    try { saveGame(); } catch { /* best effort */ }
+    const g = useGfxStore.getState();
+    const hud = useHudStore.getState();
+    console.warn(`[td] ${why} (#${gpuTrouble.current}, quality ${g.quality}${g.safe ? " safe" : ""})`);
+    if (remounts.current >= MAX_REMOUNTS) {
+      hud.showMsg("GRAPHICS STOPPED — reopen the game");
+      return;
+    }
+    remounts.current++;
+    if (g.quality === "high" && !g.safe && gpuTrouble.current === 1) {
+      g.setSafe(true);
+      hud.showMsg("GRAPHICS: HIGH (safe mode — GPU memory)");
+      setCtxKey((k) => k + 1);
+    } else if (g.quality === "high") {
+      hud.showMsg("GRAPHICS: LOW (GPU ran out of memory)");
+      g.setQuality("low"); // new key -> remount
+    } else {
+      if (g.dprScale > 0.72) g.setDprScale(0.7);
+      hud.showMsg("GRAPHICS RESET…");
+      setCtxKey((k) => k + 1);
+    }
+  }, []);
 
   // Frame watchdog: page visible, game loaded, JS thread alive (this interval
   // runs) but no frame rendered — if the GL context is lost (and the browser
   // never restores it) or nothing has rendered for 30 s, the GL side is wedged
-  // (GPU reset on Android emulators…): save and remount the Canvas instead of
-  // leaving the player on a frozen picture. Conservative on purpose so a merely
-  // slow device never gets remount-looped; at most twice per session. ?wd=0 off.
-  const glRef = useRef<THREE.WebGLRenderer | null>(null);
+  // (GPU reset on Android emulators…): recover() instead of leaving the player
+  // on a frozen picture. Conservative so a merely slow device is never hit. ?wd=0 off.
   useEffect(() => {
     if (new URLSearchParams(location.search).get("wd") === "0") return;
     let lastFrames = renderedFrames();
     let stalled = 0;
-    let remounts = 0;
     const id = window.setInterval(() => {
       const f = renderedFrames();
       const ready = useLoadStore.getState().phase === "ready";
-      if (f !== lastFrames || document.visibilityState !== "visible" || !ready || remounts >= 2) { stalled = 0; lastFrames = f; return; }
+      if (f !== lastFrames || document.visibilityState !== "visible" || !ready) { stalled = 0; lastFrames = f; return; }
       stalled++;
       const lost = glRef.current?.getContext().isContextLost() ?? false;
-      if ((lost && stalled >= 4) || stalled >= 30) {
+      if ((lost && stalled >= 6) || stalled >= 30) {
         stalled = 0;
-        remounts++;
-        try { saveGame(); } catch { /* best effort */ }
-        console.warn("[td] render loop stalled — remounting the canvas");
-        setCtxKey((k) => k + 1);
+        recover("render loop stalled — remounting the canvas");
       }
     }, 1000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [recover]);
+
 
   return (
     <div style={{ position: "fixed", inset: 0 }}>
       <Canvas
-        key={`${quality}:${ctxKey}`}
+        key={canvasKey}
         shadows={prof.shadows === "soft" ? "percentage" : prof.shadows === "basic" ? "basic" : false}
         dpr={prof.dpr}
         camera={{ fov: 65, near: 0.1, far: 400 }}
@@ -248,14 +311,20 @@ export default function Game() {
             }
           };
           const el = gl.domElement;
+          const myKey = canvasKey;
           let restoreTimer = 0;
           el.addEventListener("webglcontextlost", (e) => {
             e.preventDefault();
+            if (liveKey.current !== myKey) return; // our own unmount (forceContextLoss), not a GPU problem
             useHudStore.getState().showMsg("GRAPHICS RESET…");
-            // some Android WebViews never fire "restored" — remount anyway
-            restoreTimer = window.setTimeout(() => setCtxKey((k) => k + 1), 3000);
+            // some Android WebViews never fire "restored" — recover anyway
+            window.clearTimeout(restoreTimer);
+            restoreTimer = window.setTimeout(() => { if (liveKey.current === myKey) recover("WebGL context lost"); }, 3000);
           });
-          el.addEventListener("webglcontextrestored", () => { window.clearTimeout(restoreTimer); setCtxKey((k) => k + 1); });
+          el.addEventListener("webglcontextrestored", () => {
+            window.clearTimeout(restoreTimer);
+            if (liveKey.current === myKey) recover("WebGL context lost + restored");
+          });
         }}
       >
         <Suspense fallback={null}>
@@ -381,18 +450,26 @@ export default function Game() {
               true emissive neon blooms. DynamicBloom ports the original's
               per-frame strength formula. Desktop HIGH only: on phones the
               extra full-screen passes cost more than the whole scene. */}
-          {prof.postFX ? (
+          {prof.postFX && prof.safe ? (
+          // crash-guard safe HIGH: no AO targets at all
+          <EffectComposer multisampling={0}>
+            <DynamicBloom />
+            <SMAA />
+          </EffectComposer>
+          ) : prof.postFX ? (
           <EffectComposer multisampling={0}>
             {/* ambient occlusion first (contact/crevice shadowing before
                 bloom adds light), SMAA last (smooths the final composited
-                edges, not just the raw geometry pass) */}
-            <N8AO aoRadius={2} distanceFalloff={1} intensity={3} quality="medium" />
+                edges, not just the raw geometry pass). Half-res AO (v1.5):
+                a quarter of the AO targets' GPU memory. */}
+            <N8AO aoRadius={2} distanceFalloff={1} intensity={3} quality="medium" halfRes />
             <DynamicBloom />
             <SMAA />
           </EffectComposer>
           ) : null}
         </Suspense>
       </Canvas>
+      <CrashSentinel />
       <LoadingScreen />
       <HUD />
       <TouchControls />
