@@ -9,7 +9,7 @@ import { frameErrors } from "@/lib/safeFrame";
 import { physicsHealth } from "@/lib/physicsGuard";
 import { useHudStore } from "@/lib/hudStore";
 import { cameraLook } from "@/lib/cameraLook";
-import { pedestrianPositions } from "@/components/Pedestrians";
+import { pedestrianPositions, pedDrawStats } from "@/components/Pedestrians";
 import { requestPlayerTeleport } from "@/lib/playerTeleport";
 import { worldState } from "@/lib/worldState";
 
@@ -22,6 +22,7 @@ if (typeof window !== "undefined") {
     health: () => ({ frameErrors: { ...frameErrors }, physics: { ...physicsHealth } }),
     active: () => useHudStore.getState().active,
     // orbit the chase camera (screenshots of the car's front)
+    pedStats: () => ({ ...pedDrawStats, total: pedestrianPositions.length }),
     peds: () => pedestrianPositions.map((p) => ({ x: p.x, z: p.z, h: p.h, robot: p.robot })),
     player: () => ({ x: worldState.px, y: worldState.py, z: worldState.pz, h: worldState.heading }),
     // on-foot only: drop the player at x,z facing h (screenshots of the robots)

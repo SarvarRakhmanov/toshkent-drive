@@ -7,6 +7,7 @@ import { worldState } from "@/lib/worldState";
 import { useHudStore } from "@/lib/hudStore";
 import { SHORE_X } from "@/lib/marina";
 import { NPC_ROBOTS, useNpcRobots } from "@/components/RobotModels";
+import { useGfxStore } from "@/lib/gfx";
 import { AIRPORT_CHUNKS } from "@/components/City";
 import { requestPedestrianHitSlowdown } from "@/lib/pedestrianHit";
 
@@ -29,8 +30,9 @@ const LOOP_LEN = SIDE * 4; // 288, matches the original's literal `per`
 // InstancedMesh per robot type / LOD / material — ~22 draw calls for all of
 // them instead of ~15 per box person. Full detail (~5k tris) inside NEAR_DIST,
 // a ~1.6-2.8k LOD out to FAR_DIST, nothing beyond (they're specks by then).
-const NEAR_DIST2 = 32 * 32;
-const FAR_DIST2 = 150 * 150;
+// (LOW graphics: 20 m / 90 m.) Robots behind the camera are skipped too — the
+// instanced meshes can't be frustum-culled as a whole.
+const LOD_DIST = { high: [32, 150], low: [20, 90] } as const;
 const OFFICER_ROBOT = NPC_ROBOTS.findIndex((r) => r.id === "checkered-guard");
 const CIVILIAN_ROBOTS = NPC_ROBOTS.map((_, i) => i).filter((i) => i !== OFFICER_ROBOT);
 
@@ -123,6 +125,9 @@ const PED_SPECS: PedSpec[] = [
 // laneBlocked() so AI traffic actually brakes for someone standing in the
 // road instead of clipping straight through them (that hit-test above only
 // ever covered the PLAYER's own driven vehicle, never scripted lane cars).
+/** Last frame's robot draw stats (test hook / perf profile). */
+export const pedDrawStats = { near: 0, far: 0, tris: 0 };
+
 export const pedestrianPositions: { x: number; z: number; h: number; robot: number }[] = PED_SPECS.map((p) => ({ x: 0, z: 0, h: 0, robot: p.robot }));
 
 // Walks the 72m perimeter of a block centred at (cx,cz) — ported verbatim
@@ -308,6 +313,11 @@ function PedestrianRobots() {
 
   useFrame((frameState, dt) => {
     const t = frameState.clock.elapsedTime;
+    const [nearD, farD] = LOD_DIST[useGfxStore.getState().quality];
+    const NEAR_DIST2 = nearD * nearD, FAR_DIST2 = farD * farD;
+    const cam = frameState.camera;
+    cam.getWorldDirection(tmp.p);
+    const fx = tmp.p.x, fz = tmp.p.z, cx = cam.position.x, cz = cam.position.z;
     for (const lods of meshes) for (const parts of lods) for (const im of parts) im.count = 0;
     for (let i = 0; i < PED_SPECS.length; i++) {
       const g = holders[i];
@@ -318,6 +328,9 @@ function PedestrianRobots() {
       const dz = g.position.z - worldState.pz;
       const d2 = dx * dx + dz * dz;
       if (d2 > FAR_DIST2) continue;
+      // behind the camera (with a margin for the robot's own size / wide FOV)
+      const vx = g.position.x - cx, vz = g.position.z - cz;
+      if (vx * fx + vz * fz < -3) continue;
       const lod = d2 < NEAR_DIST2 ? 0 : 1;
       tmp.e.set(g.rotation.x, g.rotation.y, g.rotation.z + ps.sway, g.rotation.order);
       tmp.q.setFromEuler(tmp.e);
@@ -326,7 +339,15 @@ function PedestrianRobots() {
       for (const im of meshes[spec.robot][lod]) im.setMatrixAt(im.count++, tmp.m);
     }
     // an empty InstancedMesh still costs a draw call (and a shadow-pass one): hide it
-    for (const lods of meshes) for (const parts of lods) for (const im of parts) { im.visible = im.count > 0; if (im.count) im.instanceMatrix.needsUpdate = true; }
+    pedDrawStats.near = pedDrawStats.far = pedDrawStats.tris = 0;
+    for (const lods of meshes) lods.forEach((parts, lod) => parts.forEach((im, pi) => {
+      im.visible = im.count > 0;
+      if (!im.count) return;
+      im.instanceMatrix.needsUpdate = true;
+      if (pi === 0) { if (lod === 0) pedDrawStats.near += im.count; else pedDrawStats.far += im.count; }
+      const ix = im.geometry.index;
+      pedDrawStats.tris += im.count * (ix ? ix.count : im.geometry.getAttribute("position").count) / 3;
+    }));
   });
 
   return <primitive object={root} />;

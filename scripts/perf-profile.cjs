@@ -68,6 +68,7 @@ const log = (...a) => console.log(`[perf-${TAG}]`, ...a);
   const gcHeap = async () => { await page.evaluate(() => window.gc && window.gc()); await page.waitForTimeout(300); return (await page.evaluate(() => window.__tdPerf())).heapMB; };
   const idle = await sample();
   log("idle:", JSON.stringify(idle));
+  log("pedestrian robots drawn (idle):", JSON.stringify(await page.evaluate(() => window.__td && window.__td.pedStats ? window.__td.pedStats() : null)));
   const heap0 = await gcHeap();
   await page.screenshot({ path: `${OUT}/perf-${TAG}-idle.png` });
   // drive: hold W with some steering for the session, sampling long tasks + heap
@@ -92,6 +93,7 @@ const log = (...a) => console.log(`[perf-${TAG}]`, ...a);
   const lt = await page.evaluate(() => window.__lt);
   const heap1 = await gcHeap();
   log("driving:", JSON.stringify(drv));
+  log("pedestrian robots drawn (driving):", JSON.stringify(await page.evaluate(() => window.__td && window.__td.pedStats ? window.__td.pedStats() : null)));
   log(`avg fps (software GL, relative only): ${(frames / secs).toFixed(1)}; long tasks: ${lt.n} totalling ${Math.round(lt.ms)} ms, worst ${Math.round(lt.max)} ms`);
   log(`heap after GC: start ${heap0} MB -> end ${heap1} MB over ${Math.round(secs)} s; samples ${JSON.stringify(heaps)}`);
   const world = await page.evaluate(() => ({ ...window.__tdWorld }));
