@@ -1,0 +1,38 @@
+@import "tailwindcss";
+@source "./";
+
+@theme {
+  --color-ink: #101614;
+  --color-panel: #1a2420;
+  --color-panel-2: #24302b;
+  --color-line: #31423b;
+  --color-cream: #f4ecdc;
+  --color-muted: #a7b6ad;
+  --color-tile: #1e8f7b;
+  --color-gold: #d4b06a;
+  --color-rust: #c4513a;
+  --color-good: #8fd0a8;
+  --font-display: "Fraunces", Palatino, "Palatino Linotype", serif;
+  --font-sans: "Outfit", "Avenir Next", "Segoe UI", sans-serif;
+  --radius-lg: 1rem;
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--color-ink);
+    color: var(--color-cream);
+    font-family: var(--font-sans);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  #root {
+    height: 100%;
+  }
+}

@@ -1,0 +1,188 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+  background: #050814;
+  font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  user-select: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* ---- HUD chrome, ported 1:1 from the original index.html's <style> block ---- */
+#hud { position: fixed; top: 14px; left: 16px; color: #fff; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8); z-index: 5; pointer-events: none; }
+#hud .title { font-size: 15px; font-weight: 800; letter-spacing: 3px; background: linear-gradient(90deg, #ff4fd8, #4fd8ff); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9)); }
+#clock { font-size: 13px; opacity: 0.9; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+#speedo { position: fixed; bottom: 22px; right: 210px; text-align: right; color: #fff; z-index: 5; pointer-events: none; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9); background: rgba(8, 10, 16, 0.5); padding: 10px 18px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14); backdrop-filter: blur(4px); }
+#speedo .num { font-size: 52px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+#speedo .unit { font-size: 12px; letter-spacing: 2px; opacity: 0.8; }
+#speedo .veh { font-size: 14px; font-weight: 700; color: #ffd76a; letter-spacing: 1px; margin-top: 2px; }
+
+#nitrobar { position: fixed; bottom: 104px; right: 210px; width: 172px; z-index: 5; pointer-events: none; }
+#nitrobar .nlabel { color: #7fdfff; font: 700 11px system-ui, sans-serif; letter-spacing: 2px; margin-bottom: 4px; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9); }
+#nitrobar .nhint { color: rgba(255, 255, 255, 0.5); font-weight: 500; }
+#nitrobar .ntrack { height: 12px; background: rgba(8, 10, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 7px; overflow: hidden; backdrop-filter: blur(4px); }
+#nitrobar .nfill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, #0a6cff, #28e8ff); box-shadow: 0 0 10px rgba(40, 232, 255, 0.7); }
+#nitrobar.active .nfill { background: linear-gradient(90deg, #ff8a1f, #ffe14a); }
+
+#vig { position: fixed; inset: 0; pointer-events: none; z-index: 4; background: radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.42) 100%); }
+
+#hint { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%); color: #fff; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.25); padding: 8px 18px; border-radius: 8px; font-size: 15px; z-index: 5; pointer-events: none; }
+#msg { position: fixed; top: 18%; left: 50%; transform: translateX(-50%); color: #ffd76a; font-size: 26px; font-weight: 800; letter-spacing: 2px; text-shadow: 0 3px 10px rgba(0, 0, 0, 0.9); z-index: 5; opacity: 0; transition: opacity 0.5s; pointer-events: none; text-align: center; }
+#msg.show { opacity: 1; }
+
+#controls { position: fixed; bottom: 16px; left: 16px; color: rgba(255, 255, 255, 0.85); font-size: 12px; line-height: 1.7; z-index: 5; background: rgba(0, 0, 0, 0.4); padding: 10px 14px; border-radius: 10px; pointer-events: none; }
+#controls b { color: #ffd76a; display: inline-block; min-width: 74px; }
+
+#minimap { position: fixed; bottom: 16px; right: 16px; width: 180px; height: 180px; border-radius: 10px; border: 2px solid rgba(255, 255, 255, 0.25); z-index: 5; background: #0a0c12; cursor: pointer; }
+#maphint { position: fixed; bottom: 200px; right: 16px; width: 184px; text-align: center; color: rgba(255, 255, 255, 0.75); font-size: 11px; letter-spacing: 0.5px; z-index: 5; pointer-events: none; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+
+#waypoint { position: fixed; top: 44px; left: 50%; transform: translateX(-50%); z-index: 5; color: #fff; background: rgba(8, 10, 16, 0.5); padding: 6px 14px; border-radius: 10px; display: flex; align-items: center; gap: 8px; font-size: 13px; pointer-events: none; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9); }
+#waypoint .arrow { color: #ff4fd8; font-size: 16px; line-height: 1; display: inline-block; }
+#waypoint .lbl { background: linear-gradient(90deg, #ff4fd8, #4fd8ff); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 700; letter-spacing: 1px; }
+#waypoint .dist { color: #ffd76a; font-variant-numeric: tabular-nums; }
+
+#mapscreen { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: rgba(4, 6, 12, 0.72); backdrop-filter: blur(3px); }
+#mapcard { background: rgba(12, 15, 22, 0.96); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 16px; padding: 18px 20px; display: flex; gap: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); }
+#mapcard h2 { margin: 0 0 10px; font-size: 15px; letter-spacing: 2px; font-weight: 800; background: linear-gradient(90deg, #ff4fd8, #4fd8ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+#bigmap { border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.15); background: #0a0c12; cursor: crosshair; display: block; }
+#mapcanvaswrap { position: relative; width: fit-content; }
+#mapzoom { position: absolute; bottom: 10px; right: 10px; display: flex; align-items: center; gap: 6px; background: rgba(12, 15, 22, 0.85); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 9px; padding: 4px 8px; }
+#mapzoom button { width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.08); color: #e6e8ee; font-size: 15px; font-weight: 700; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+#mapzoom button:hover { background: rgba(255, 255, 255, 0.18); border-color: rgba(255, 255, 255, 0.4); }
+#mapzoom span { color: #ffd76a; font-size: 11px; font-variant-numeric: tabular-nums; min-width: 26px; text-align: center; }
+#mapright { width: 230px; display: flex; flex-direction: column; }
+#maplist { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 470px; }
+#maplist button { display: flex; align-items: center; gap: 9px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.14); color: #e6e8ee; font-size: 13px; font-weight: 600; padding: 9px 11px; border-radius: 9px; cursor: pointer; text-align: left; letter-spacing: 0.4px; width: 100%; }
+#maplist button:hover { background: rgba(255, 255, 255, 0.13); border-color: rgba(255, 255, 255, 0.35); }
+#maplist button.active { border-color: #ffd76a; background: rgba(255, 215, 106, 0.14); }
+#maplist button .dot { width: 11px; height: 11px; border-radius: 50%; flex: 0 0 auto; box-shadow: 0 0 7px currentColor; }
+#maplist button .nm { flex: 1; }
+#maplist button .km { color: #ffd76a; font-variant-numeric: tabular-nums; font-size: 12px; }
+#mapclose { margin-top: 12px; text-align: center; color: rgba(255, 255, 255, 0.7); font-size: 12px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 9px; padding: 8px; cursor: pointer; letter-spacing: 1px; }
+#mapclose:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+
+#camsel { position: fixed; top: 72px; left: 16px; z-index: 6; display: flex; gap: 5px; }
+#camsel button { background: rgba(10, 12, 20, 0.65); border: 1px solid rgba(255, 255, 255, 0.22); color: #cfd3da; font-size: 11px; padding: 4px 9px; border-radius: 7px; cursor: pointer; letter-spacing: 0.5px; }
+#camsel button.on { background: #ffd76a; color: #14161d; border-color: #ffd76a; font-weight: 700; }
+
+#logout { position: fixed; top: 14px; right: 16px; z-index: 6; background: rgba(10, 12, 20, 0.65); border: 1px solid rgba(255, 255, 255, 0.22); color: #cfd3da; font-size: 11px; padding: 5px 11px; border-radius: 7px; cursor: pointer; letter-spacing: 0.5px; }
+#logout:hover { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.4); color: #fff; }
+
+#sensitivity { position: fixed; top: 108px; left: 16px; z-index: 6; display: flex; align-items: center; gap: 7px; background: rgba(10, 12, 20, 0.65); border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 7px; padding: 5px 10px; color: #cfd3da; font-size: 10px; letter-spacing: 0.5px; }
+#sensitivity input[type="range"] { width: 90px; accent-color: #ffd76a; cursor: pointer; }
+#sensitivity span { color: #ffd76a; font-variant-numeric: tabular-nums; min-width: 32px; text-align: right; }
+
+/* ---- login gate, shown before Game mounts (see app/page.tsx) — reuses the
+   HUD's own magenta/cyan wordmark treatment for the title so it reads as the
+   same brand mark, not a second logo ---- */
+#login { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #050814; overflow: hidden; }
+#login .bg-slides { position: absolute; inset: 0; z-index: 0; }
+#login .bg-slide { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; animation: bg-cycle 42s infinite; }
+#login .bg-slide:nth-child(1) { animation-delay: 0s; }
+#login .bg-slide:nth-child(2) { animation-delay: 6s; }
+#login .bg-slide:nth-child(3) { animation-delay: 12s; }
+#login .bg-slide:nth-child(4) { animation-delay: 18s; }
+#login .bg-slide:nth-child(5) { animation-delay: 24s; }
+#login .bg-slide:nth-child(6) { animation-delay: 30s; }
+#login .bg-slide:nth-child(7) { animation-delay: 36s; }
+#login .content { position: relative; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 28px; animation: login-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@keyframes bg-cycle {
+  0% { opacity: 0; transform: scale(1); }
+  2% { opacity: 1; transform: scale(1.02); }
+  14.2857% { opacity: 1; transform: scale(1.12); }
+  16.2857% { opacity: 0; transform: scale(1.14); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+#login .title { font-size: clamp(32px, 5vw, 52px); font-weight: 800; letter-spacing: 6px; color: #ffd76a; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 24px rgba(0, 0, 0, 0.7)) drop-shadow(0 0 16px rgba(255, 215, 106, 0.55)); }
+#login .subtitle { color: #fff; font-size: 14px; letter-spacing: 0.5px; margin-top: -14px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 12px rgba(0, 0, 0, 0.7); }
+#login .card { display: flex; flex-direction: column; align-items: center; gap: 14px; background: rgba(12, 15, 22, 0.85); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px; padding: 28px 32px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); backdrop-filter: blur(6px); }
+#login .missing { color: #ffd76a; font-size: 13px; text-align: center; max-width: 320px; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 215, 106, 0.3); padding: 10px 16px; border-radius: 10px; }
+#login .missing code { font-family: ui-monospace, "SF Mono", monospace; font-size: 12px; }
+#login .signin-error { color: #ff9b9b; font-size: 12px; text-align: center; }
+#login .guest-btn { background: none; border: none; color: rgba(255, 255, 255, 0.55); font-size: 12px; letter-spacing: 0.3px; cursor: pointer; padding: 2px 4px; text-decoration: underline; text-decoration-color: rgba(255, 255, 255, 0.25); text-underline-offset: 3px; transition: color 0.15s ease; }
+#login .guest-btn:hover { color: rgba(255, 255, 255, 0.9); text-decoration-color: rgba(255, 255, 255, 0.6); }
+#login .legal { display: flex; align-items: center; gap: 8px; color: rgba(255, 255, 255, 0.4); font-size: 11px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+#login .legal a { color: inherit; text-decoration: none; }
+#login .legal a:hover { color: rgba(255, 255, 255, 0.75); }
+
+@keyframes login-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #login .content { animation: none; }
+  #login .bg-slide { animation: none; opacity: 0; }
+  #login .bg-slide:first-child { opacity: 1; }
+}
+
+@media (max-width: 480px) {
+  #login .title { letter-spacing: 3px; }
+}
+
+/* ---- privacy/terms — HD hero header + plain-text body, linked from the
+   login footer. Self-scrolls (position:fixed + overflow-y:auto) rather than
+   touching html/body, which stay overflow:hidden for the game canvas. ---- */
+.legal-page { position: fixed; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; background: #050814; color: rgba(255, 255, 255, 0.85); user-select: text; }
+
+.legal-hero { position: relative; height: 220px; background-size: cover; background-position: center; display: flex; flex-direction: column; justify-content: flex-end; padding: 20px 24px 26px; }
+.legal-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(5, 8, 20, 0.15) 0%, rgba(5, 8, 20, 0.55) 60%, #050814 100%); pointer-events: none; }
+
+.legal-back { position: absolute; top: 18px; left: 18px; z-index: 2; display: inline-flex; align-items: center; gap: 6px; background: rgba(12, 15, 22, 0.55); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255, 255, 255, 0.16); border-top-color: rgba(255, 255, 255, 0.32); color: #fff; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 999px; text-decoration: none; transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease; }
+.legal-back:hover { background: rgba(12, 15, 22, 0.78); }
+.legal-back:active { transform: scale(0.96); }
+
+.legal-hero h1 { position: relative; z-index: 1; font-size: clamp(28px, 6vw, 44px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; color: #ffd76a; margin: 0; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 20px rgba(0, 0, 0, 0.6)); animation: login-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: 0.05s; }
+.legal-hero .updated { position: relative; z-index: 1; margin: 6px 0 0; font-size: 12px; letter-spacing: 0.3px; color: rgba(255, 255, 255, 0.6); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); animation: login-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: 0.12s; }
+
+.legal-body { max-width: 640px; margin: 0 auto; padding: 40px 24px 100px; }
+.legal-body section { border-top: 1px solid rgba(255, 255, 255, 0.08); margin-top: 26px; padding-top: 26px; animation: login-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.legal-body section:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+.legal-body section:nth-child(1) { animation-delay: 0.16s; }
+.legal-body section:nth-child(2) { animation-delay: 0.22s; }
+.legal-body section:nth-child(3) { animation-delay: 0.28s; }
+.legal-body h2 { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: #fff; margin: 0 0 10px; }
+.legal-body p { font-size: 15px; line-height: 1.7; color: rgba(255, 255, 255, 0.72); margin: 0; }
+.legal-body p a { color: #ffd76a; text-decoration: underline; text-decoration-color: rgba(255, 215, 106, 0.35); text-underline-offset: 3px; }
+.legal-body p a:hover { text-decoration-color: rgba(255, 215, 106, 0.8); }
+.legal-body ul { list-style: none; padding: 0; margin: 10px 0 0; }
+.legal-body li { position: relative; padding-left: 18px; font-size: 15px; line-height: 1.7; color: rgba(255, 255, 255, 0.72); margin-bottom: 8px; }
+.legal-body li::before { content: ""; position: absolute; left: 0; top: 11px; width: 6px; height: 1px; background: #ffd76a; }
+
+@media (max-width: 480px) {
+  .legal-hero { height: 180px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .legal-hero h1, .legal-hero .updated, .legal-body section { animation: none; }
+}
+
+@media (max-width: 900px) {
+  #hud .title { font-size: 12px; letter-spacing: 2px; }
+  #clock { font-size: 11px; }
+  #speedo { right: auto; left: 50%; transform: translateX(-50%); bottom: 12px; padding: 6px 14px; border-radius: 10px; }
+  #speedo .num { font-size: 36px; }
+  #nitrobar { right: auto; left: 50%; transform: translateX(-50%); bottom: 92px; width: 150px; }
+  #minimap { width: 100px; height: 100px; right: 10px; }
+  #camsel { left: 10px; gap: 3px; }
+  #camsel button { font-size: 9px; padding: 3px 6px; }
+  #logout { top: 10px; right: 10px; font-size: 9px; padding: 4px 8px; }
+  #sensitivity { left: 10px; top: 100px; padding: 4px 8px; }
+  #sensitivity input[type="range"] { width: 60px; }
+  #hint { font-size: 13px; bottom: 80px; padding: 6px 14px; }
+  #controls { display: none; }
+}
+
+/* ---- Toshkent Drive quick tools (graphics quality + car picker) ---- */
+#td-tools { position: fixed; top: 14px; right: 16px; z-index: 9; display: flex; gap: 6px; }
+#td-tools button { background: rgba(10,12,20,.7); border: 1px solid rgba(255,215,106,.45); color: #ffd76a; font: 700 11px/1 monospace; letter-spacing: 1px; padding: 7px 10px; border-radius: 8px; cursor: pointer; }
+@media (pointer: coarse) { #td-tools { top: auto; bottom: max(240px, env(safe-area-inset-bottom)); right: 10px; flex-direction: column; } }
