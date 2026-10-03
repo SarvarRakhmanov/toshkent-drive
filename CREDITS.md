@@ -38,6 +38,15 @@ re-centred on the driver's eye, materials merged, decimated, meshopt-compressed)
 | models/interiors/gt-interior.glb | Autonomous GT Car Interior Design - Manual Mode | [benlockett](https://sketchfab.com/benlockett) | BMW M3 Competition, Kia K5, Kia Seltos | https://sketchfab.com/3d-models/autonomous-gt-car-interior-design-manual-mode-b4627fc6d22f45c496ed548ba3c9be10 |
 | models/interiors/sedan-interior.glb | Car interior | [Gerhald](https://sketchfab.com/Gerhald) | Chevrolet Lacetti, BMW M3 E30 | https://sketchfab.com/3d-models/car-interior-c5f830a811af4917972de8fa47949de9 |
 
+## Player robot (v1.4, CC BY 4.0, Sketchfab)
+| File | Model | Author | Source |
+|---|---|---|---|
+| models/robots/big-boss.glb | The Big Boss | [FrazierChristopher](https://sketchfab.com/FrazierChristopher) | https://sketchfab.com/3d-models/the-big-boss-875e6bda9c4048a2af821d122dbbb1aa |
+
+Modified: scaled to human height (1.85 m), textures 512 px WebP, meshopt compression
+(4.6 MB → 0.29 MB, 8,229 triangles). The model has no rig or animations, so the game cuts
+its legs and arms apart at load time and swings them procedurally (walk / jump / sit).
+
 ## Traffic cars (all CC BY 4.0, Sketchfab)
 | File | Model | Author | Source |
 |---|---|---|---|

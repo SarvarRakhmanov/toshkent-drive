@@ -36,6 +36,9 @@ export function CreditsPanel() {
         <b>Car interior</b> by Gerhald (Sketchfab, CC BY 4.0, modified).
       </p>
       <p>
+        Player robot: <b>The Big Boss</b> by FrazierChristopher (Sketchfab, CC BY 4.0, modified).
+      </p>
+      <p>
         Traffic cars by DanielZhabotinsky and roh3d. Buildings by cn-entertainment, MrAeterna,
         bral_unit, Lost_Gecko and Colin.Greenall (Sketchfab, CC BY 4.0). Sky HDRI and tree
         textures from Poly Haven (CC0).

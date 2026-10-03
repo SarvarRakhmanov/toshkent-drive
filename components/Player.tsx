@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, Suspense } from "react";
 import { useThree } from "@react-three/fiber";
 import { useFrame } from "@/lib/safeFrame";
 import { RigidBody, CuboidCollider, useRapier, type RapierRigidBody, type RapierCollider } from "@react-three/rapier";
@@ -15,6 +15,8 @@ import { playerTeleport } from "@/lib/playerTeleport";
 import { SHORE_X, isOnBridgeOrBase, groundYAt } from "@/lib/marina";
 import { requestFire } from "@/lib/tankShell";
 import type { KinematicCharacterController } from "@dimforge/rapier3d-compat";
+import { PlayerRobotMesh, playerLimbs } from "@/components/RobotModels";
+import { BootHold } from "@/components/ReadyGate";
 
 const DROWN_LIMIT = 2; // seconds in open water before respawn
 
@@ -88,15 +90,9 @@ export function Player() {
   const bodyRef = useRef<RapierRigidBody>(null);
   const colliderRef = useRef<RapierCollider>(null);
   const groupRef = useRef<THREE.Group>(null);
-  const legL = useRef<THREE.Group>(null);
-  const legR = useRef<THREE.Group>(null);
-  // Knee pivots — only used by the seated pose (default rotation 0 everywhere
-  // else), so the walk cycle/ragdoll/mid-air-tuck code below is untouched:
-  // it only ever sets legL/legR (the hip), same as before this split.
-  const kneeL = useRef<THREE.Group>(null);
-  const kneeR = useRef<THREE.Group>(null);
-  const armL = useRef<THREE.Mesh>(null);
-  const armR = useRef<THREE.Mesh>(null);
+  // v1.4: the on-foot body is "The Big Boss" robot (components/RobotModels.tsx),
+  // one rigid mesh — the walk is procedural: rig bobs / sways / leans.
+  const rig = useRef<THREE.Group>(null);
   const keys = useKeyboard();
   const { camera } = useThree();
 
@@ -213,13 +209,12 @@ export function Player() {
       // which cancels the hip's rotation and brings the shin back to
       // hanging straight down from the knee — the actual L-shape a seated
       // pose needs, not achievable by rotating one rigid leg box.
-      if (legL.current && legR.current && kneeL.current && kneeR.current && armL.current && armR.current) {
-        legL.current.rotation.set(-Math.PI / 2, 0, 0);
-        legR.current.rotation.set(-Math.PI / 2, 0, 0);
-        kneeL.current.rotation.set(Math.PI / 2, 0, 0);
-        kneeR.current.rotation.set(Math.PI / 2, 0, 0);
-        armL.current.rotation.set(-0.2, 0, 0.12);
-        armR.current.rotation.set(-0.2, 0, -0.12);
+      // sit: legs swing forward at the hips (thighs on the cushion), body
+      // lowered so the hips sit on it, lean back a touch
+      playerLimbs.sit = true;
+      if (rig.current) {
+        rig.current.position.set(0, -0.36, -0.1);
+        rig.current.rotation.set(-0.12, 0, 0);
       }
       // Deliberately NOT applyCameraRig's chase mode here: chase parks the
       // camera chaseDist (9.5) BEHIND the target along -facing, but VIP
@@ -426,29 +421,25 @@ export function Player() {
     // original's bollywood dance emote
     const moving = Math.abs(foot.current.speed) > 0.15;
     walkPhase.current += d * (moving ? (sprint ? 13 : 8) : 0);
-    const sw = Math.sin(walkPhase.current) * (moving ? clamp(Math.abs(foot.current.speed) / sp, 0, 1) * 0.6 : 0);
-    // Knee only ever bends for the seated pose above; every other state
-    // (walk/ragdoll/dance/idle) drives the hip only, so undo a stale bend
-    // left over from just standing up out of a seat.
-    if (kneeL.current) kneeL.current.rotation.set(0, 0, 0);
-    if (kneeR.current) kneeR.current.rotation.set(0, 0, 0);
-    if (legL.current && legR.current && armL.current && armR.current) {
+    if (rig.current) {
+      const r = rig.current;
+      const amt = moving ? clamp(Math.abs(foot.current.speed) / sp, 0, 1) : 0;
+      const t = state.clock.elapsedTime;
+      playerLimbs.phase = walkPhase.current; playerLimbs.amt = amt; playerLimbs.air = !grounded; playerLimbs.sit = false;
       if (!grounded) {
-        legL.current.rotation.set(0.55, 0, 0);
-        legR.current.rotation.set(-0.25, 0, 0);
-        armL.current.rotation.set(-0.9, 0, 0);
-        armR.current.rotation.set(-0.9, 0, 0);
+        r.position.set(0, 0, 0);
+        r.rotation.set(0.18, 0, 0);
       } else if (hud.inClub && move === 0) {
-        const t2 = state.clock.elapsedTime * (130 / 60) * Math.PI * 2;
-        armL.current.rotation.set(Math.PI + Math.sin(t2) * 1.0, 0, 0.4 + Math.sin(t2 * 0.5) * 0.5);
-        armR.current.rotation.set(Math.PI + Math.cos(t2 * 1.05) * 1.0, 0, -0.4 - Math.sin(t2 * 0.5) * 0.5);
-        legL.current.rotation.set(Math.max(0, Math.sin(t2)) * 0.35, 0, 0);
-        legR.current.rotation.set(Math.max(0, -Math.sin(t2)) * 0.35, 0, 0);
+        // dance emote: beat-synced bounce + hip twist
+        const t2 = t * (130 / 60) * Math.PI * 2;
+        r.position.set(0, Math.abs(Math.sin(t2)) * 0.08, 0);
+        r.rotation.set(0, Math.sin(t2 * 0.5) * 0.35, Math.sin(t2) * 0.08);
       } else {
-        legL.current.rotation.set(sw, 0, 0);
-        legR.current.rotation.set(-sw, 0, 0);
-        armL.current.rotation.set(-sw * 0.7, 0, 0);
-        armR.current.rotation.set(sw * 0.7, 0, 0);
+        // footstep bob (two per stride), side-to-side roll, forward lean with
+        // speed; idle = slow "servo breathing"
+        const ph = walkPhase.current;
+        r.position.set(Math.sin(ph) * 0.03 * amt, Math.abs(Math.sin(ph)) * 0.07 * amt + (amt === 0 ? Math.sin(t * 1.6) * 0.008 : 0), 0);
+        r.rotation.set((sprint ? 0.12 : 0.05) * amt, Math.sin(ph) * 0.05 * amt, Math.sin(ph) * 0.03 * amt);
       }
     }
 
@@ -473,45 +464,17 @@ export function Player() {
     <RigidBody ref={bodyRef} type="kinematicPosition" colliders={false} position={[START.x, 1, START.z]}>
       <CuboidCollider ref={colliderRef} args={[0.3, 0.75, 0.3]} collisionGroups={PLAYER_GROUPS} />
       <group ref={groupRef} position={[0, -0.75, 0]}>
-        <PersonMesh legL={legL} legR={legR} kneeL={kneeL} kneeR={kneeR} armL={armL} armR={armR} />
+        <group ref={rig}>
+          {/* BootHold keeps the loading screen up until the robot is in */}
+          <Suspense fallback={<BootHold />}>
+            <PlayerRobotMesh />
+          </Suspense>
+        </group>
         <group ref={chuteRef} visible={false}>
           <ParachuteMesh />
         </group>
       </group>
     </RigidBody>
-  );
-}
-
-// Exact geometry/pivots ported from the original's pMesh construction
-// (jacket/vest/tie suit), EXCEPT the legs: the original rotated one rigid
-// leg box around its own centre, fine for a walk cycle's small swing but
-// unusable for a ~90° seated bend (the box tips through the pelvis instead
-// of folding at a joint). legL/legR are now hip PIVOT GROUPS (thigh
-// hanging from HIP_Y, the leg's old top edge) with a child knee group
-// (kneeL/kneeR) carrying the shin + shoe — walking still only ever
-// rotates the hip group, so it looks identical to before at small angles;
-// only the seated pose (Player's useFrame) drives the knee.
-const HIP_Y = 0.59; // old leg box's top edge (0.34 centre + 0.25 half-height) — where it met the pelvis
-const SEG_LEN = 0.25; // half the old single box's 0.5 length, split evenly thigh/shin
-
-function Leg({ x, legRef, kneeRef, trouser, shoe }: { x: number; legRef: React.RefObject<THREE.Group | null>; kneeRef: React.RefObject<THREE.Group | null>; trouser: React.ReactNode; shoe: React.ReactNode }) {
-  return (
-    <group ref={legRef} position={[x, HIP_Y, 0]}>
-      <mesh position={[0, -SEG_LEN / 2, 0]} castShadow>
-        <boxGeometry args={[0.17, SEG_LEN, 0.17]} />
-        {trouser}
-      </mesh>
-      <group ref={kneeRef} position={[0, -SEG_LEN, 0]}>
-        <mesh position={[0, -SEG_LEN / 2, 0]} castShadow>
-          <boxGeometry args={[0.17, SEG_LEN, 0.17]} />
-          {trouser}
-        </mesh>
-        <mesh position={[0, -SEG_LEN - 0.045, 0.04]} castShadow>
-          <boxGeometry args={[0.17, 0.09, 0.3]} />
-          {shoe}
-        </mesh>
-      </group>
-    </group>
   );
 }
 
@@ -525,7 +488,7 @@ const RISER_MAT = new THREE.MeshBasicMaterial({ color: "#2a2a2c" });
 // head puts the head around y~1.5), risers run down to shoulder height.
 function ParachuteMesh() {
   return (
-    <group position={[0, 2.2, 0]}>
+    <group position={[0, 2.6, 0]}>
       {/* dome canopy — alternating coloured gores via 8 wedge segments */}
       {Array.from({ length: 8 }).map((_, i) => (
         <mesh key={i} rotation={[0, (i / 8) * Math.PI * 2, 0]} material={i % 2 === 0 ? CANOPY_MAT : CANOPY_STRIPE_MAT} castShadow>
@@ -543,84 +506,6 @@ function ParachuteMesh() {
           <cylinderGeometry args={[0.015, 0.015, 1.3, 6]} />
         </mesh>
       ))}
-    </group>
-  );
-}
-
-function PersonMesh({
-  legL,
-  legR,
-  kneeL,
-  kneeR,
-  armL,
-  armR,
-}: {
-  legL: React.RefObject<THREE.Group | null>;
-  legR: React.RefObject<THREE.Group | null>;
-  kneeL: React.RefObject<THREE.Group | null>;
-  kneeR: React.RefObject<THREE.Group | null>;
-  armL: React.RefObject<THREE.Mesh | null>;
-  armR: React.RefObject<THREE.Mesh | null>;
-}) {
-  const jacket = <meshLambertMaterial color="#1c2230" />;
-  const trouser = <meshLambertMaterial color="#161b26" />;
-  const white = <meshLambertMaterial color="#f2f2f4" />;
-  const vest = <meshLambertMaterial color="#39415a" />;
-  const tie = <meshLambertMaterial color="#7a1626" />;
-  const skin = <meshLambertMaterial color="#d9a066" />;
-  const shoe = <meshStandardMaterial color="#0a0a0c" roughness={0.25} metalness={0.4} />;
-  return (
-    <group>
-      <Leg x={-0.11} legRef={legL} kneeRef={kneeL} trouser={trouser} shoe={shoe} />
-      <Leg x={0.11} legRef={legR} kneeRef={kneeR} trouser={trouser} shoe={shoe} />
-      <mesh position={[0, 0.92, 0]} castShadow>
-        <boxGeometry args={[0.48, 0.6, 0.28]} />
-        {jacket}
-      </mesh>
-      <mesh position={[0, 0.88, 0.155]}>
-        <boxGeometry args={[0.3, 0.44, 0.04]} />
-        {vest}
-      </mesh>
-      <mesh position={[0, 1.08, 0.165]}>
-        <boxGeometry args={[0.17, 0.18, 0.035]} />
-        {white}
-      </mesh>
-      <mesh position={[0, 0.98, 0.18]}>
-        <boxGeometry args={[0.07, 0.3, 0.03]} />
-        {tie}
-      </mesh>
-      <mesh ref={armL} position={[-0.32, 0.9, 0]} castShadow>
-        <boxGeometry args={[0.13, 0.52, 0.13]} />
-        {jacket}
-      </mesh>
-      <mesh ref={armR} position={[0.32, 0.9, 0]} castShadow>
-        <boxGeometry args={[0.13, 0.52, 0.13]} />
-        {jacket}
-      </mesh>
-      <mesh position={[-0.32, 0.63, 0]}>
-        <boxGeometry args={[0.135, 0.06, 0.135]} />
-        {white}
-      </mesh>
-      <mesh position={[0.32, 0.63, 0]}>
-        <boxGeometry args={[0.135, 0.06, 0.135]} />
-        {white}
-      </mesh>
-      <mesh position={[-0.32, 0.56, 0]}>
-        <boxGeometry args={[0.1, 0.09, 0.1]} />
-        {skin}
-      </mesh>
-      <mesh position={[0.32, 0.56, 0]}>
-        <boxGeometry args={[0.1, 0.09, 0.1]} />
-        {skin}
-      </mesh>
-      <mesh position={[0, 1.38, 0]} castShadow>
-        <sphereGeometry args={[0.16, 12, 12]} />
-        {skin}
-      </mesh>
-      <mesh position={[0, 1.5, -0.02]}>
-        <boxGeometry args={[0.3, 0.1, 0.3]} />
-        <meshLambertMaterial color="#201812" />
-      </mesh>
     </group>
   );
 }
