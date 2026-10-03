@@ -27,6 +27,7 @@ import { SHORE_X, DROWN_RESPAWN, clampFromWater, isOnBridgeOrBase, groundYAt } f
 import { SupercarBody, styleFor, RIDE_HEIGHT, type CarStyle, type Detail } from "@/components/SupercarBody";
 import { CarInterior, cockpitCameraArgs } from "@/components/CarInterior";
 import { usePlayerCarStore, PLAYER_CARS } from "@/lib/playerCar";
+import { useCareer } from "@/lib/career";
 import { QueryFilterFlags, type KinematicCharacterController } from "@dimforge/rapier3d-compat";
 import { tmpQuat, AXIS_Y } from "@/lib/scratch";
 
@@ -64,7 +65,7 @@ export function Car() {
   // v1.6 driving physics state + the per-car spec (lib/playerCar.ts `phys`)
   const dyn = useRef(newDynState());
   const visBody = useRef<THREE.Group>(null);
-  const specCache = useRef<{ index: number; spec: VehicleSpec } | null>(null);
+  const specCache = useRef<{ index: number; rev: number; spec: VehicleSpec } | null>(null);
   const controllerRef = useRef<KinematicCharacterController | null>(null);
 
   useEffect(() => {
@@ -181,7 +182,12 @@ export function Car() {
 
     // v1.6: tyre/suspension/gearbox model (lib/vehicleDynamics.ts)
     const carIdx = usePlayerCarStore.getState().index;
-    if (!specCache.current || specCache.current.index !== carIdx) specCache.current = { index: carIdx, spec: effectiveSpec(PLAYER_CARS[carIdx]?.phys, STOCK) };
+    // v1.9: garage upgrades (lib/career.ts) scale the physics spec; rev bumps on purchase
+    const career = useCareer.getState();
+    if (!specCache.current || specCache.current.index !== carIdx || specCache.current.rev !== career.rev) {
+      const def = PLAYER_CARS[carIdx];
+      specCache.current = { index: carIdx, rev: career.rev, spec: effectiveSpec(def?.phys, def ? career.upgradesFor(def.id) : STOCK) };
+    }
     const hb = isActive && k.handbrake;
     rampSteer(car.current, steer, hb, d);
     const bt = body.translation();

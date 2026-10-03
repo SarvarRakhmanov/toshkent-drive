@@ -114,6 +114,11 @@ export function toggleMute() {
   return muted;
 }
 
+/** the shared AudioContext once audio is unlocked (null while muted / before a gesture) */
+export function getAudioCtx(): AudioContext | null {
+  return audio && !muted ? audio.ctx : null;
+}
+
 export function isMuted() {
   return muted;
 }

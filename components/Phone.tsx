@@ -6,6 +6,10 @@ import { worldState } from "@/lib/worldState";
 import { requestCarSummon } from "@/lib/vehicleSummon";
 import { cycleWeather } from "@/lib/weatherState";
 import { LANDMARKS } from "@/lib/landmarks";
+import { useMissions, type MissionKind } from "@/lib/missions";
+import { useCareer, UPGRADE_KEYS, UPGRADE_LABEL, UPGRADE_COST, MAX_LEVEL } from "@/lib/career";
+import { PLAYER_CARS, usePlayerCarStore } from "@/lib/playerCar";
+import { saveGame } from "@/lib/saveGame";
 
 // GTA-style phone overlay (P to open/close, same modal pattern as
 // BigMap.tsx's mapOpen/#mapscreen) — three real actions wired onto existing
@@ -20,7 +24,23 @@ export function Phone() {
   const setPhoneOpen = useHudStore((s) => s.setPhoneOpen);
   const setNavTarget = useHudStore((s) => s.setNavTarget);
   const showMsg = useHudStore((s) => s.showMsg);
+  const mission = useMissions((s) => s.m);
+  const money = useCareer((s) => s.money);
+  const levels = useCareer((s) => s.levels);
+  const carIdx = usePlayerCarStore((s) => s.index);
   if (!open) return null;
+  const car = PLAYER_CARS[carIdx];
+  const lv = { ...{ power: 0, grip: 0, brakes: 0, weight: 0 }, ...levels[car.id] };
+
+  const startJob = (k: MissionKind) => {
+    const err = useMissions.getState().start(k);
+    if (err) showMsg(err);
+    setPhoneOpen(false);
+  };
+  const buy = (k: (typeof UPGRADE_KEYS)[number]) => {
+    const r = useCareer.getState().buy(car.id, k);
+    showMsg(r === "ok" ? `${UPGRADE_LABEL[k].toUpperCase()} INSTALLED` : r === "max" ? "ALREADY MAXED" : "NOT ENOUGH MONEY");
+  };
 
   const callMechanic = () => {
     const { px, pz, heading } = worldState;
@@ -36,7 +56,8 @@ export function Phone() {
       onClick={() => setPhoneOpen(false)}
     >
       <div
-        style={{ width: 280, background: "linear-gradient(#181c24,#0d0f14)", border: "1px solid #2a3040", borderRadius: 22, padding: "22px 16px", boxShadow: "0 0 40px rgba(0,0,0,0.6)" }}
+        data-scroll
+        style={{ width: 280, maxHeight: "92vh", overflowY: "auto", touchAction: "pan-y", background: "linear-gradient(#181c24,#0d0f14)", border: "1px solid #2a3040", borderRadius: 22, padding: "22px 16px", boxShadow: "0 0 40px rgba(0,0,0,0.6)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ textAlign: "center", color: "#8fd6ff", fontWeight: 700, letterSpacing: 2, marginBottom: 14 }}>TOSHKENT MOBILE</div>
@@ -46,8 +67,31 @@ export function Phone() {
           <span style={hintStyle}>deliver my car here</span>
         </button>
 
+        <div style={{ margin: "10px 0 4px", color: "#6a7280", fontSize: 11, letterSpacing: 1 }}>JOBS · <span style={{ color: "#9dff6a" }}>${money.toLocaleString("en-US")}</span></div>
+        {mission ? (
+          <button type="button" id="job-cancel" onClick={() => { useMissions.getState().cancel(); setPhoneOpen(false); }} style={{ ...btnStyle, color: "#ff6a5f" }}>
+            ✖ Cancel: {mission.title}
+          </button>
+        ) : (
+          <div style={{ display: "flex", gap: 4 }}>
+            <button type="button" id="job-taxi" onClick={() => startJob("taxi")} style={{ ...btnStyle, textAlign: "center", padding: "8px 4px", fontSize: 12 }}>🚕 Taxi</button>
+            <button type="button" id="job-delivery" onClick={() => startJob("delivery")} style={{ ...btnStyle, textAlign: "center", padding: "8px 4px", fontSize: 12 }}>📦 Delivery</button>
+            <button type="button" id="job-race" onClick={() => startJob("race")} style={{ ...btnStyle, textAlign: "center", padding: "8px 4px", fontSize: 12 }}>🏁 Race</button>
+          </div>
+        )}
+
+        <div style={{ margin: "10px 0 4px", color: "#6a7280", fontSize: 11, letterSpacing: 1 }}>GARAGE · {car.name}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+          {UPGRADE_KEYS.map((k) => (
+            <button key={k} type="button" id={`up-${k}`} onClick={() => buy(k)} style={{ ...btnStyle, padding: "6px 8px", fontSize: 12, marginBottom: 0 }}>
+              {UPGRADE_LABEL[k]} {"●".repeat(lv[k])}{"○".repeat(MAX_LEVEL - lv[k])}
+              <span style={hintStyle}>{lv[k] >= MAX_LEVEL ? "MAX" : `$${UPGRADE_COST[lv[k] + 1]}`}</span>
+            </button>
+          ))}
+        </div>
+
         <div style={{ margin: "10px 0 4px", color: "#6a7280", fontSize: 11, letterSpacing: 1 }}>SET GPS WAYPOINT</div>
-        <div data-scroll style={{ maxHeight: 190, overflowY: "auto", touchAction: "pan-y", display: "flex", flexDirection: "column", gap: 4 }}>
+        <div data-scroll style={{ maxHeight: 120, overflowY: "auto", touchAction: "pan-y", display: "flex", flexDirection: "column", gap: 4 }}>
           {LANDMARKS.map((l) => (
             <button
               key={l.name}
@@ -72,6 +116,10 @@ export function Phone() {
           style={{ ...btnStyle, marginTop: 10 }}
         >
           ☁️ Change Weather
+        </button>
+
+        <button type="button" id="save-game" onClick={() => { saveGame(); showMsg("GAME SAVED"); setPhoneOpen(false); }} style={{ ...btnStyle, marginTop: 4 }}>
+          💾 Save Game
         </button>
 
         <button type="button" onClick={() => setPhoneOpen(false)} style={{ ...btnStyle, marginTop: 10, textAlign: "center", color: "#ff6a5f" }}>

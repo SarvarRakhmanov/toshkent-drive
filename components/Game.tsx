@@ -32,6 +32,7 @@ import { Boat } from "@/components/Boat";
 import { Bike } from "@/components/Bike";
 import { Traffic } from "@/components/Traffic";
 import { TrafficSignals } from "@/components/TrafficSignals";
+import { Missions } from "@/components/Missions";
 import { Pedestrians } from "@/components/Pedestrians";
 import { Player } from "@/components/Player";
 import { Club } from "@/components/Club";
@@ -372,6 +373,7 @@ export default function Game() {
             <Deferred stage={1}>
               <group name="Traffic"><Traffic /></group>
               <TrafficSignals />
+              <Missions />
               <group name="Pedestrians"><Suspense fallback={<BootHold />}><Pedestrians /></Suspense></group>
               <Player />
             </Deferred>

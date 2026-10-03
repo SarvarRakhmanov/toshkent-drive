@@ -9,6 +9,7 @@ import { saveGame } from "@/lib/saveGame";
 import { Minimap } from "@/components/Minimap";
 import { BigMap } from "@/components/BigMap";
 import { Phone } from "@/components/Phone";
+import { MissionHud } from "@/components/MissionHud";
 import { useTouchStore } from "@/lib/touch";
 
 // Speedo/NitroBar/Waypoint each own their own store subscription and are
@@ -243,6 +244,7 @@ export function HUD() {
       {!isTouch && <div id="maphint">click map for directions</div>}
       <BigMap />
       <Phone />
+      <MissionHud />
     </>
   );
 }

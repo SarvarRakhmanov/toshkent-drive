@@ -13,6 +13,8 @@ import { pedestrianPositions, pedDrawStats } from "@/components/Pedestrians";
 import { requestPlayerTeleport } from "@/lib/playerTeleport";
 import { worldState } from "@/lib/worldState";
 import { signalFor, signalTime } from "@/lib/trafficSignals";
+import { useMissions, type MissionKind } from "@/lib/missions";
+import { useCareer } from "@/lib/career";
 
 if (typeof window !== "undefined") {
   (window as unknown as { __td: unknown }).__td = {
@@ -28,6 +30,12 @@ if (typeof window !== "undefined") {
     player: () => ({ x: worldState.px, y: worldState.py, z: worldState.pz, h: worldState.heading }),
     // on-foot only: drop the player at x,z facing h (screenshots of the robots)
     tp: (x: number, z: number, h = 0) => requestPlayerTeleport(x, z, h),
+    mission: () => { const m = useMissions.getState().m; return m ? { kind: m.kind, stage: m.stage, n: m.targets.length, target: m.targets[m.stage], timeLeft: m.timeLeft, pay: m.pay } : null; },
+    startMission: (k: MissionKind) => useMissions.getState().start(k),
+    career: () => { const c = useCareer.getState(); return { money: c.money, jobs: c.jobs, levels: c.levels, rev: c.rev }; },
+    giveMoney: (n: number) => useCareer.getState().addMoney(n),
+    buyUpgrade: (car: string, k: "power" | "grip" | "brakes" | "weight") => useCareer.getState().buy(car, k),
+    enter: (k: string) => { useHudStore.getState().setActive(k as never); useHudStore.getState().setCamMode(0); },
     signal: () => { const t = signalTime(); return { t, x: signalFor("x", t), z: signalFor("z", t) }; },
     look: (yaw: number, pitch = 0) => { cameraLook.targetYaw = cameraLook.yaw = yaw; cameraLook.targetPitch = cameraLook.pitch = pitch; },
   };
