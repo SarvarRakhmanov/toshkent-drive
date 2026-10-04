@@ -28,8 +28,9 @@ export function CreditsPanel() {
         Toshkent Drive is a free, non-commercial game.
       </p>
       <p>
-        <b>Lacetti</b> by uzb_rx7, <b>BMW M3 E30</b> by TinoD2, <b>Kia K5</b> by dannzjs
-        (Sketchfab, CC BY 4.0). Kia Seltos model supplied by the owner.
+        <b>Lacetti</b> by uzb_rx7, <b>BMW M3 E30</b> by TinoD2, <b>Kia K5</b> by dannzjs,{" "}
+        <b>Chevrolet Cobalt LTZ</b> by uzb_rx7, <b>Chevrolet Captiva</b> by Alien1974555,{" "}
+        <b>Lada VAZ-2103 Zhiguli</b> by Black Snow (Sketchfab, CC BY 4.0, modified: decimated/compressed). Kia Seltos model supplied by the owner.
       </p>
       <p>
         Cockpit interiors: <b>Autonomous GT Car Interior Design</b> by benlockett and{" "}

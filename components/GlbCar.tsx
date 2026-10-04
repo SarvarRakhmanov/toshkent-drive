@@ -298,14 +298,19 @@ export const TRAFFIC_MODELS = [
   { url: "/models/traffic/hatch-b.glb", length: 4.1 },
   { url: "/models/traffic/van-a.glb", length: 4.9 },
   { url: "/models/traffic/taxi-a.glb", length: 4.5 },
-];
+  // v1.7b NPC LODs of the player Cobalt / Captiva / 2103 (≈6–9k tris, 256 px,
+  // palette-baked colours, so no tint)
+  { url: "/models/traffic/cobalt.glb", length: 4.48, rotY: Math.PI, noTint: true },
+  { url: "/models/traffic/captiva.glb", length: 4.67, rotY: 0, noTint: true },
+  { url: "/models/traffic/lada2103.glb", length: 4.12, rotY: 0, noTint: true },
+] as { url: string; length: number; rotY?: number; noTint?: boolean }[];
 
 export function TrafficGlbCar({ index, color }: { index: number; color: string }) {
   const def = TRAFFIC_MODELS[Math.abs(index) % TRAFFIC_MODELS.length];
   const gltf = useGLTF(asset(def.url));
   const taxi = def.url.includes("taxi");
   const obj = useMemo(() => {
-    const o = prepare(gltf.scene, 0, def.length, undefined, taxi ? "#f2c200" : color, true, false);
+    const o = prepare(gltf.scene, def.rotY ?? 0, def.length, undefined, taxi ? "#f2c200" : color, !def.noTint, false);
     // v2.1 perf: NPC cars have no wheel rig, so the whole body is static —
     // merge per material look (a queue of 6 at a red light was ~50 calls)
     mergeStaticBody(o, null);

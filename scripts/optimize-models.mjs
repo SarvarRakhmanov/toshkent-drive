@@ -12,7 +12,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
-import { metalRough, dedup, flatten, join, weld, simplify, prune, textureCompress, meshopt, sparse, palette } from "@gltf-transform/functions";
+import { metalRough, normals, dedup, flatten, join, weld, simplify, prune, textureCompress, meshopt, sparse, palette } from "@gltf-transform/functions";
 
 import { bakeSkins, dropUnusedUVs } from "./gltf-helpers.mjs";
 
@@ -38,6 +38,15 @@ const JOBS = [
   ["bmw-m3-competition.glb", "cars/bmw-m3-competition.glb", 70000, 256],
   ["k5.glb", "cars/k5.glb", 60000, 1024],
   ["lacetti.glb", "cars/lacetti.glb", 22446, 1024],
+  // v1.7b Uzbek-street cars (Sketchfab, CC BY): cabin parts dropped (the
+  // cockpit view draws CarInterior instead), ground plane removed
+  ["cobalt.glb", "cars/cobalt.glb", 50000, 1024, /^bancos|^painel|^steering_ok|^Gravel/i, { strip: true, steps: 10 }],
+  ["captiva.glb", "cars/captiva.glb", 55000, 1024, /^plaquette|^visse/i, { strip: true, steps: 10 }],
+  ["lada2103.glb", "cars/lada2103.glb", 45000, 1024, /^Torpedoplastic2103|^2103Divan|^steer_02a|^Radiola2103|^Lada2103_gauges|^Suspension|^coilfeal/i],
+  // NPC traffic LODs of the same three (no wheel rig, merged static body)
+  ["cobalt.glb", "traffic/cobalt.glb", 6000, 256, /^bancos|^painel|^steering_ok|^Gravel/i, { strip: true, steps: 12, errScale: 2 }],
+  ["captiva.glb", "traffic/captiva.glb", 6000, 256, /^interior|^plaquette|^visse/i, { strip: true, steps: 12, errScale: 2 }],
+  ["lada2103.glb", "traffic/lada2103.glb", 6000, 256, /^Torpedoplastic2103|^2103Divan|^steer_02a|^Radiola2103|^Lada2103_gauges|^Suspension|^coilfeal|^amdb11|^VAZPotolok/i, { strip: true, steps: 12, errScale: 2 }],
   ["sedan-a.glb", "traffic/sedan-a.glb", 6000, 256],
   ["sedan-b.glb", "traffic/sedan-b.glb", 6000, 256],
   ["hatch-a.glb", "traffic/hatch-a.glb", 6000, 256],
@@ -61,7 +70,7 @@ function tris(doc) {
 }
 
 const ONLY = process.env.ONLY ? new RegExp(process.env.ONLY) : null; // e.g. ONLY="bmw|k5"
-for (const [file, out, budget, px, drop] of JOBS) {
+for (const [file, out, budget, px, drop, opts = {}] of JOBS) {
   if (ONLY && !ONLY.test(file)) continue;
   const input = path.join(src, file);
   if (!fs.existsSync(input)) { console.log("skip", file); continue; }
@@ -76,7 +85,7 @@ for (const [file, out, budget, px, drop] of JOBS) {
   for (const n of doc.getRoot().listNodes()) {
     if (Math.abs(det3(n.getWorldMatrix())) < 1e-12) n.dispose();
   }
-  if (drop) {
+  if (drop instanceof RegExp) {
     for (const mesh of doc.getRoot().listMeshes()) for (const prim of mesh.listPrimitives()) {
       if (drop.test(prim.getMaterial()?.getName() || "")) prim.dispose();
     }
@@ -107,16 +116,27 @@ for (const [file, out, budget, px, drop] of JOBS) {
   const baked = bakeSkins(doc);
   if (baked) console.log(`  baked ${baked} skinned meshes`);
   dropUnusedUVs(doc);
+  // opts.strip: drop normals (and UVs on untextured materials) so the
+  // simplifier can collapse across hard-edge seams; normals are rebuilt after
+  if (opts.strip) {
+    for (const mesh of doc.getRoot().listMeshes()) for (const prim of mesh.listPrimitives()) {
+      const m = prim.getMaterial();
+      prim.setAttribute("NORMAL", null);
+      const textured = m && (m.getBaseColorTexture() || m.getNormalTexture() || m.getMetallicRoughnessTexture());
+      if (!textured) for (const sem of prim.listSemantics()) if (sem.startsWith("TEXCOORD")) prim.setAttribute(sem, null);
+    }
+  }
   await doc.transform(dedup(), palette({ min: 2 }), flatten(), join({ keepNamed: false }), weld(), prune());
   const t0 = tris(doc);
   if (t0 > budget) {
     // step the ratio down until we land under budget (simplify is error-bounded)
     let ratio = budget / t0;
-    for (let k = 0; k < 6 && tris(doc) > budget * 1.05; k++) {
-      await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio: Math.min(1, ratio), error: 0.004 * (k + 1), lockBorder: false }));
+    for (let k = 0; k < (opts.steps || 6) && tris(doc) > budget * 1.05; k++) {
+      await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio: Math.min(1, ratio), error: 0.004 * (k + 1) * (opts.errScale || 1), lockBorder: false }));
       ratio = (budget / tris(doc)) * 0.95;
     }
   }
+  if (opts.strip) await doc.transform(normals({ overwrite: false }));
   await doc.transform(
     prune(),
     textureCompress({ targetFormat: "webp", resize: [px, px], quality: 82 }),

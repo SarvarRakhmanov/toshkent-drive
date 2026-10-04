@@ -9,7 +9,7 @@
 // The low-pass opens with rpm and throttle, which is most of what makes a
 // revving engine sound "on load" vs coasting.
 
-export type EngineProfileId = "i4small" | "i4turbo" | "i4race" | "i6turbo" | "v8" | "v6" | "diesel" | "tankDiesel" | "bike" | "boat" | "turbine" | "rotor";
+export type EngineProfileId = "i4small" | "i4eco" | "i4suv" | "i4carb" | "i4turbo" | "i4race" | "i6turbo" | "v8" | "v6" | "diesel" | "tankDiesel" | "bike" | "boat" | "turbine" | "rotor";
 
 export interface EngineProfile {
   cyl: number; // cylinders (sets firing order)
@@ -32,6 +32,12 @@ export interface EngineProfile {
 export const ENGINE_PROFILES: Record<EngineProfileId, EngineProfile> = {
   // Chevrolet Lacetti 1.6 — small, buzzy, not much bass
   i4small: { cyl: 4, idle: 800, redline: 6400, fire: 0.75, sub: 0.15, whine: 0.04, whineOrder: 4, noise: 0.18, noiseHz: 900, cutoff: 380, cutoffRev: 1400, volume: 0.052 },
+  // Chevrolet Cobalt 1.5 (B15D2, made in Asaka) — thin, slightly droning economy four
+  i4eco: { cyl: 4, idle: 750, redline: 6200, fire: 0.7, sub: 0.12, whine: 0.06, whineOrder: 6, noise: 0.2, noiseHz: 1000, cutoff: 360, cutoffRev: 1250, volume: 0.05 },
+  // Chevrolet Captiva 2.4 (LE9) — bigger, deeper four with an auto-box hum
+  i4suv: { cyl: 4, idle: 700, redline: 6300, fire: 0.75, sub: 0.38, whine: 0.07, whineOrder: 8, noise: 0.15, noiseHz: 750, cutoff: 300, cutoffRev: 1150, volume: 0.058 },
+  // Lada VAZ-2103 1.45 carburettor four — loud, uneven, lots of intake/exhaust rasp
+  i4carb: { cyl: 4, idle: 850, redline: 6000, fire: 0.95, sub: 0.3, whine: 0.02, whineOrder: 3, noise: 0.42, noiseHz: 650, cutoff: 330, cutoffRev: 1600, volume: 0.062 },
   // Kia Seltos / K5 1.6T–2.5 — smooth four with turbo whistle
   i4turbo: { cyl: 4, idle: 750, redline: 6600, fire: 0.7, sub: 0.25, whine: 0.12, whineOrder: 9, noise: 0.14, noiseHz: 1200, cutoff: 340, cutoffRev: 1300, volume: 0.055 },
   // BMW E30 M3 (S14 2.3 high-rev four) — rasp, sharp intake, screams to 7200

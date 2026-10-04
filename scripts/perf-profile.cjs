@@ -18,6 +18,7 @@ const log = (...a) => console.log(`[perf-${TAG}]`, ...a);
         userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" }
     : { viewport: { width: 1280, height: 720 } });
   if (process.env.QUALITY) await ctx.addInitScript((q) => localStorage.setItem("td_gfx_quality", q), process.env.QUALITY);
+  if (process.env.CAR) await ctx.addInitScript((c) => localStorage.setItem("td_player_car", c), process.env.CAR);
   await ctx.addInitScript(() => {
     window.__lt = { n: 0, ms: 0, max: 0 };
     try {
