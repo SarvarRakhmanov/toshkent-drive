@@ -47,6 +47,9 @@ const JOBS = [
   ["cobalt.glb", "traffic/cobalt.glb", 6000, 256, /^bancos|^painel|^steering_ok|^Gravel/i, { strip: true, steps: 12, errScale: 2 }],
   ["captiva.glb", "traffic/captiva.glb", 6000, 256, /^interior|^plaquette|^visse/i, { untextured: true, strip: true, steps: 12, errScale: 2 }],
   ["lada2103.glb", "traffic/lada2103.glb", 6000, 256, /^Torpedoplastic2103|^2103Divan|^steer_02a|^Radiola2103|^Lada2103_gauges|^Suspension|^coilfeal|^amdb11|^VAZPotolok/i, { untextured: true, strip: true, steps: 12, errScale: 2 }],
+  // v1.8 police: 2016 Ford Mustang Police Barricade (sohyalebret, CC BY) — player police car + chase units
+  ["mustang-police.glb", "police/mustang.glb", 32000, 512, /^cockpit|^seat|^engine_ok|^gauge|^spoon|^suspensidetail/i, { strip: true, steps: 10 }],
+  ["mustang-police.glb", "police/mustang-low.glb", 6000, 256, /^cockpit|^seat|^engine_ok|^gauge|^spoon|^suspensidetail|^underbody/i, { untextured: true, strip: true, steps: 12, errScale: 2 }],
   // v1.7b real Tashkent landmarks (Sketchfab; licences in CREDITS.md)
   ["landmarks/temur.glb", "landmarks/temur.glb", 14000, 1024],
   ["landmarks/oliy-majlis.glb", "landmarks/oliy-majlis.glb", 18000, 512, null, { strip: true, steps: 10 }],

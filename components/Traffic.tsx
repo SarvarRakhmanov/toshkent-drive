@@ -9,7 +9,6 @@ import { RigidBody, CuboidCollider, type RapierRigidBody } from "@react-three/ra
 import * as THREE from "three";
 import { CarMesh } from "@/components/Car";
 import { TrafficGlbCar } from "@/components/GlbCar";
-import { MergeStatic } from "@/components/SceneTools";
 import { RIDE_HEIGHT, styleFor, type CarStyle } from "@/components/SupercarBody";
 import { PoliceCarMesh } from "@/components/PoliceCar";
 import { PoliceJeepMesh } from "@/components/ParkedPoliceJeep";
@@ -547,7 +546,7 @@ function TrafficCar({ lane, seed, index }: { lane: Lane; seed: number; index: nu
         {lane.police ? (
           // v2.1 perf: ~50 tiny procedural meshes → ~12 draws (only the
           // light-bar material colours animate; each has a unique look)
-          <MergeStatic name="police" byLook><PoliceCarMesh lightRefs={lightRefs} detail="low" /></MergeStatic>
+          <group name="police"><PoliceCarMesh lightRefs={lightRefs} detail="low" /></group>
         ) : lane.policeJeep ? (
           // PoliceJeepMesh's own root sits AT ground level (unlike the
           // SupercarBody-family meshes above, which assume their local

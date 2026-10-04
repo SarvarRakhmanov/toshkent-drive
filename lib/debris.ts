@@ -24,6 +24,9 @@ export function spawnDebris(b: DebrisBurst) {
  * it" — the same signal enableAutostep/computeColliderMovement already expose,
  * just compared before/after. Debounced per-vehicle via `cooldown` so a car
  * pinned against a wall doesn't fire every frame. */
+/** v1.8: notified on every player crash (components/PoliceChase.tsx turns a crash into a car into a crime) */
+export const crashHook: { fn: ((x: number, z: number) => void) | null } = { fn: null };
+
 export function checkCrashDebris(
   cooldown: { current: number },
   dt: number,
@@ -48,5 +51,6 @@ export function checkCrashDebris(
     dz: ch,
     power: Math.max(0.3, Math.min(1, speedMs / 25)),
   });
+  crashHook.fn?.(pos.x + sh * 2.2, pos.z + ch * 2.2);
   cooldown.current = 0.6;
 }

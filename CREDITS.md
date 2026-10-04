@@ -140,3 +140,9 @@ Licences checked on the Sketchfab API on 2026-10-04; the user explicitly approve
 | block-hkiv-0…3 (+ -imp) | Full Gameready City Buildings IV [HongKong] | [abhayexe](https://sketchfab.com/abhayexe) | Sketchfab Free Standard (369k tris source) | https://sketchfab.com/3d-models/full-gameready-city-buildings-iv-hongkong-31c1ede1fcbd49c7af85825905446ec5 |
 | block-hk-0…7 (+ -imp) | Full Gameready City Buildings [HongKong] | [Katydid (Katydid.)](https://sketchfab.com/Katydid.) | Sketchfab Free Standard (52k tris source) | https://sketchfab.com/3d-models/full-gameready-city-buildings-hongkong-1c67779cde264f0e986fbae9b76cc421 |
 | block-scene-0…1 (+ -imp) | City Scene | [golukumar (mortalityrexotable)](https://sketchfab.com/mortalityrexotable) | Sketchfab Free Standard (1.29M tris source) | https://sketchfab.com/3d-models/city-scene-c00b3b8c71594890a2a3c46c20a30b5c |
+
+
+## Police (v1.8)
+| Files | Model | Author | License | Source |
+|---|---|---|---|---|
+| models/police/mustang.glb, mustang-low.glb | 2016 Ford Mustang Police Barricade | [sohyalebret](https://sketchfab.com/sohyalebret) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (licence verified on the Sketchfab API 2026-10-04), **modified** (cabin dropped, 714k → 33.4k / 6.2k tris, textures 512 px WebP, meshopt) | https://sketchfab.com/3d-models/2016-ford-mustang-police-barricade-d54ad13ac57d41c28479db79009ae71e |

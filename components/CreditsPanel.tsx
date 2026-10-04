@@ -38,6 +38,9 @@ export function CreditsPanel() {
         <b>NBU Uzbekistan Tashkent</b> by UZBEK 3D, <b>Nest One</b> by qudratovalisher83 (CC BY 4.0).
       </p>
       <p>
+        Police: <b>2016 Ford Mustang Police Barricade</b> by sohyalebret (Sketchfab, CC BY 4.0, modified).
+      </p>
+      <p>
         Big City map (Sketchfab, modified: sliced into blocks, decimated, impostors baked):{" "}
         <b>Full Gameready City Buildings [retextured]</b> by golukumar (CC BY 4.0),{" "}
         <b>Full Gameready City Buildings IV [HongKong]</b> by abhayexe,{" "}

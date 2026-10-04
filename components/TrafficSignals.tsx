@@ -47,7 +47,7 @@ const lampIdx: number[] = [];
 const lampAxis: number[] = [];
 const lampBulb: number[] = [];
 
-function junctionOk(x: number, z: number): boolean {
+export function junctionOk(x: number, z: number): boolean {
   if (x >= SHORE_X - 60) return false;
   for (const [dx, dz] of [[-50, -50], [50, -50], [-50, 50], [50, 50]]) {
     const key = `${Math.round((x + dx) / CELL)},${Math.round((z + dz) / CELL)}`;

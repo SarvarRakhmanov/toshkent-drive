@@ -10,6 +10,7 @@ import { NPC_ROBOTS, useNpcRobots } from "@/components/RobotModels";
 import { useGfxStore } from "@/lib/gfx";
 import { AIRPORT_CHUNKS } from "@/components/City";
 import { requestPedestrianHitSlowdown } from "@/lib/pedestrianHit";
+import { useWanted } from "@/lib/wanted";
 import { redLeft } from "@/lib/trafficSignals";
 
 // Real port of the original's pedestrian system (index.html ~line 6148-6182,
@@ -312,6 +313,7 @@ function stepPed(g: THREE.Object3D, spec: PedSpec, ps: PedState, index: number, 
           // in the same beat the ragdoll fires — the collision costs the
           // driver something too, not just the pedestrian (lib/pedestrianHit.ts)
           requestPedestrianHitSlowdown();
+          useWanted.getState().report("ped");
           ps.cross = null;
           return;
         }

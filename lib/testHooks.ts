@@ -14,6 +14,8 @@ import { requestPlayerTeleport } from "@/lib/playerTeleport";
 import { worldState } from "@/lib/worldState";
 import { signalFor, signalTime } from "@/lib/trafficSignals";
 import { useMissions, type MissionKind } from "@/lib/missions";
+import { useWanted } from "@/lib/wanted";
+import { chaseUnits } from "@/components/PoliceChase";
 import { useCareer } from "@/lib/career";
 import { weatherState } from "@/lib/weatherState";
 import { carSummon } from "@/lib/vehicleSummon";
@@ -43,6 +45,8 @@ if (typeof window !== "undefined") {
     tp: (x: number, z: number, h = 0) => requestPlayerTeleport(x, z, h),
     mission: () => { const m = useMissions.getState().m; return m ? { kind: m.kind, stage: m.stage, n: m.targets.length, target: m.targets[m.stage], timeLeft: m.timeLeft, pay: m.pay } : null; },
     startMission: (k: MissionKind) => useMissions.getState().start(k),
+    wanted: () => { const w = useWanted.getState(); return { level: w.level, reason: w.reason, evade: w.evade, bust: w.bust, fines: w.fines, units: chaseUnits.filter((u) => u.on).map((u) => ({ x: +u.x.toFixed(1), z: +u.z.toFixed(1), v: +u.v.toFixed(1) })) }; },
+    crime: (c: "red" | "crash" | "ped") => useWanted.getState().report(c),
     career: () => { const c = useCareer.getState(); return { money: c.money, jobs: c.jobs, levels: c.levels, rev: c.rev }; },
     giveMoney: (n: number) => useCareer.getState().addMoney(n),
     buyUpgrade: (car: string, k: "power" | "grip" | "brakes" | "weight") => useCareer.getState().buy(car, k),

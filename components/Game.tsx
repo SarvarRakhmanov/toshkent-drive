@@ -85,6 +85,7 @@ import { LIVERIES } from "@/components/Airliner";
 import { Props } from "@/components/Props";
 import { TashkentLandmarks } from "@/components/TashkentLandmarks";
 import { Skyline } from "@/components/Skyline";
+import { PoliceChase } from "@/components/PoliceChase";
 import { isBigCity } from "@/lib/mapChoice";
 import { Clouds } from "@/components/Clouds";
 import { Headlights } from "@/components/Headlights";
@@ -382,6 +383,7 @@ export default function Game() {
             <Deferred stage={1}>
               <group name="Traffic"><Traffic /></group>
               <TrafficSignals />
+              <PoliceChase />
               <Missions />
               <group name="Pedestrians"><Suspense fallback={<BootHold />}><Pedestrians /></Suspense></group>
               <Player />

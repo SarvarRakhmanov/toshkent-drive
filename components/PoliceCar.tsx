@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useEffect, useMemo, useState, type RefObject } from "react";
+import { Suspense, useRef, useEffect, useMemo, useState, type RefObject } from "react";
+import { MustangPoliceBody } from "@/components/MustangPolice";
 import { useThree } from "@react-three/fiber";
 import { useFrame } from "@/lib/safeFrame";
 import { RigidBody, CuboidCollider, useRapier, type RapierRigidBody, type RapierCollider } from "@react-three/rapier";
@@ -229,6 +230,16 @@ export function PoliceCarMesh({
   lightRefs: RefObject<(THREE.MeshBasicMaterial | null)[]>;
   detail?: Detail;
 }) {
+  // v1.8: the Mustang Police Barricade GLB; the old procedural interceptor
+  // stays as the loading fallback
+  return (
+    <Suspense fallback={<LegacyPoliceMesh lightRefs={lightRefs} detail={detail} />}>
+      <MustangPoliceBody lightRefs={lightRefs} low={detail === "low"} />
+    </Suspense>
+  );
+}
+
+function LegacyPoliceMesh({ lightRefs, detail }: { lightRefs: RefObject<(THREE.MeshBasicMaterial | null)[]>; detail: Detail }) {
   return (
     <SupercarBody color="#0b0d12" style="hyper" detail={detail}>
       {/* white door panels — the two-tone that reads as "police" instantly */}

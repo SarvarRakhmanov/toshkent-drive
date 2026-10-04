@@ -3,6 +3,7 @@
 import { useHudStore, CAM_MODES, type CamMode } from "@/lib/hudStore";
 import { useAuthStore } from "@/lib/authStore";
 import { useGfxStore } from "@/lib/gfx";
+import { WantedHud } from "@/components/WantedHud";
 import { usePlayerCarStore, PLAYER_CARS } from "@/lib/playerCar";
 import { actionNextCar } from "@/lib/actions";
 import { PauseMenu } from "@/components/PauseMenu";
@@ -246,6 +247,7 @@ export function HUD() {
       <BigMap />
       <Phone />
       <MissionHud />
+      <WantedHud />
       <PauseMenu />
     </>
   );
