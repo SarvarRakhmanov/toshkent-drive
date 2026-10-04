@@ -23,6 +23,8 @@ import { skyState } from "@/lib/skyState";
 
 if (typeof window !== "undefined") {
   (window as unknown as { __td: unknown }).__td = {
+    // v1.7b: NPC traffic state (scripts/traffic-heading-test.cjs)
+    npcTraffic: () => trafficPositions.map((t, i) => ({ i, npc: t.npc, x: t.x, z: t.z, h: t.h, speed: t.speed, uturn: t.uturn, axis: t.laneAxis, c: t.laneC, convoy: t.convoy, stolen: t.stolen })),
     summonCar: (x: number, z: number, h: number) => requestCarSummon(x, z, h),
     // v1.6.1: place the car EXACTLY there (no safe-spot search) — stuck tests
     forceCar: (x: number, z: number, h: number) => { requestCarSummon(x, z, h); carSummon.raw = true; },

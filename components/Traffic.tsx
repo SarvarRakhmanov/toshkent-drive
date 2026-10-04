@@ -148,6 +148,13 @@ export interface TrafficSlot {
   // respawnIn runs out, then it re-enters at the end of its lane as a fresh car
   stolen: boolean;
   respawnIn: number;
+  // v1.7b test hooks (scripts/traffic-heading-test.cjs)
+  npc?: string;
+  speed?: number;
+  uturn?: boolean;
+  laneAxis?: "x" | "z";
+  laneC?: number;
+  convoy?: boolean;
 }
 
 // styleFor(i) rather than the random roll CarMesh does by default: SupercarBody
@@ -172,6 +179,15 @@ export const trafficPositions: TrafficSlot[] = LANES.map((l, i) => ({
 // enough that the swap doesn't read as a pop-in, short enough that repeatedly
 // stealing doesn't visibly thin the city out.
 export const RESPAWN_DELAY = 14;
+
+// v1.7b: only ~5 lanes use GLB sedans, and `index % models` meant the
+// Cobalt / Captiva / 2103 NPC models never appeared — hand GLB lanes their
+// model in this order instead (TRAFFIC_MODELS indices)
+const GLB_ORDER = [6, 0, 8, 2, 7, 5, 1, 3, 4];
+const GLB_MODEL_FOR_LANE = new Map<number, number>();
+LANES.forEach((l, i) => {
+  if (!l.police && !l.policeJeep && !l.kind) GLB_MODEL_FOR_LANE.set(i, GLB_ORDER[GLB_MODEL_FOR_LANE.size % GLB_ORDER.length]);
+});
 
 export function Traffic() {
   // phones on LOW run only the core lanes; a skipped lane's slot is parked as
@@ -211,6 +227,15 @@ function stopDistanceFor(lane: Lane): number {
 }
 const LANE_HALF_WIDTH = 4.5; // covers either side of the centreline (±LANE_OFFSET) plus car width/slop
 const LANE_OFFSET = 3; // sideways shift off the road centreline (road is 20 wide, this stays well inside it)
+// v1.7b right-hand traffic (Uzbekistan). Heading h means forward =
+// (sin h, cos h) and the driver's right = (-cos h, sin h). Moving +x (h=π/2)
+// the right is +z; moving +z (h=0) the right is -x. The z-axis lanes used to
+// add +offset for +dir too, i.e. they drove on the LEFT. Signed cross-axis
+// offset of a car travelling `dir` along `axis`:
+function rightSide(axis: "x" | "z", dir: number): number {
+  return (axis === "x" ? 1 : -1) * (dir > 0 ? LANE_OFFSET : -LANE_OFFSET);
+}
+const UTURN_TIME = 2.4; // s for the half-circle U-turn at a lane end
 
 // Real vehicle world positions to treat as obstacles — vehicleState.car/bike/
 // policeCar are kept live every frame by their own components regardless of
@@ -260,7 +285,7 @@ function laneBlocked(lane: Lane, nextPos: number, dir: number, self: number, ign
   // other lane cars: only those in OUR half of the road (same-direction queue,
   // or a cross-street car still inside the junction box ahead of us) —
   // oncoming cars sit on the other side of the centreline and never block
-  const myCross = lane.lane + (dir > 0 ? LANE_OFFSET : -LANE_OFFSET);
+  const myCross = lane.lane + rightSide(lane.axis, dir);
   const gapNeed = stopDistance + 1.5;
   for (let i = 0; i < trafficPositions.length; i++) {
     if (i === self) continue;
@@ -317,6 +342,8 @@ function TrafficCar({ lane, seed, index }: { lane: Lane; seed: number; index: nu
   const vel = useRef(lane.speed); // v1.8: eased speed (signal braking / pull-away)
   const queued = useRef(0); // seconds spent queued behind another lane car
   const ghost = useRef(0); // deadlock breaker: ignore other lane cars briefly
+  const uturn = useRef(0); // v1.7b: >0 while U-turning at a lane end (s left)
+  const fwdSpeed = useRef(0); // signed forward m/s for the NPC wheel rig
   const [drawDist2] = useState(() => currentProfile().npcDrawDist ** 2);
 
   useFrame((state, dt) => {
@@ -389,27 +416,52 @@ function TrafficCar({ lane, seed, index }: { lane: Lane; seed: number; index: nu
       });
     }
     wasBlocked.current = blockKind === 1;
-    if (!blocked) {
+    if (uturn.current > 0) {
+      uturn.current = Math.max(0, uturn.current - d);
+    } else if (!blocked) {
       pos.current = nextPos;
+      // v1.7b: at a lane end swing round in a smooth half-circle U-turn
+      // (radius = LANE_OFFSET, across to the other side) instead of
+      // flipping 180° and jumping 6 m sideways in one frame
       if (pos.current > lane.max) {
         pos.current = lane.max;
         dir.current = -1;
+        uturn.current = UTURN_TIME;
       } else if (pos.current < lane.min) {
         pos.current = lane.min;
         dir.current = 1;
+        uturn.current = UTURN_TIME;
       }
     }
+    fwdSpeed.current = uturn.current > 0 ? (Math.PI * LANE_OFFSET) / UTURN_TIME : blocked ? 0 : vel.current;
 
     // right-hand-traffic offset: the ping-pong lane reverses direction at
     // each end instead of running two separate one-way lanes, so a car
     // travelling +dir and one travelling -dir need to sit on opposite sides
     // of the centreline (not glued to it) to read as "in a lane" instead of
     // driving straight down the middle/through oncoming traffic.
-    const side = dir.current > 0 ? LANE_OFFSET : -LANE_OFFSET;
-    const laneX = lane.axis === "x" ? pos.current : lane.lane + side;
-    const laneZ = lane.axis === "x" ? lane.lane + side : pos.current;
-    const laneHeading =
+    const side = rightSide(lane.axis, dir.current);
+    let laneX = lane.axis === "x" ? pos.current : lane.lane + side;
+    let laneZ = lane.axis === "x" ? lane.lane + side : pos.current;
+    let laneHeading =
       lane.axis === "x" ? (dir.current > 0 ? Math.PI / 2 : -Math.PI / 2) : dir.current > 0 ? 0 : Math.PI;
+    if (uturn.current > 0) {
+      // half circle around the lane-end point on the centreline: starts on
+      // the old (incoming) side heading the old way, ends on the new side
+      // heading the new way, always turning left across the road.
+      const t = 1 - uturn.current / UTURN_TIME; // 0 → 1
+      const e = t * t * (3 - 2 * t);
+      const oldDir = -dir.current;
+      const h0 = lane.axis === "x" ? (oldDir > 0 ? Math.PI / 2 : -Math.PI / 2) : oldDir > 0 ? 0 : Math.PI;
+      const hh = h0 + Math.PI * e; // turning left = +heading (left of h is (cos h, -sin h)… see rightSide)
+      // centre of the turn: lane-end point on the centreline
+      const cx = lane.axis === "x" ? pos.current : lane.lane;
+      const cz = lane.axis === "x" ? lane.lane : pos.current;
+      // right vector of the current heading points away from the centre
+      laneX = cx + -Math.cos(hh) * LANE_OFFSET;
+      laneZ = cz + Math.sin(hh) * LANE_OFFSET;
+      laneHeading = hh;
+    }
 
     let x = laneX;
     let z = laneZ;
@@ -472,6 +524,12 @@ function TrafficCar({ lane, seed, index }: { lane: Lane; seed: number; index: nu
     slot.x = x;
     slot.z = z;
     slot.h = heading; // lib/steal.ts hands this straight to the vehicle you take over
+    slot.npc = lane.police ? "police" : lane.policeJeep ? "policeJeep" : lane.kind ?? `glb:${GLB_MODEL_FOR_LANE.get(index)}`;
+    slot.speed = fwdSpeed.current;
+    slot.uturn = uturn.current > 0;
+    slot.laneAxis = lane.axis;
+    slot.laneC = lane.lane;
+    slot.convoy = !!(lane.police && recruited.current);
   });
 
   const [bw, bh, bl] = colliderBoxFor(lane);
@@ -505,7 +563,7 @@ function TrafficCar({ lane, seed, index }: { lane: Lane; seed: number; index: nu
           <CommercialBody kind={lane.kind} color={lane.color} detail="low" />
         ) : (
           <Suspense fallback={<CarMesh color={lane.color} style={trafficPositions[index].style} detail="low" />}>
-            <TrafficGlbCar index={index} color={lane.color} />
+            <TrafficGlbCar index={GLB_MODEL_FOR_LANE.get(index) ?? index} color={lane.color} speed={fwdSpeed} />
           </Suspense>
         )}
       </group>

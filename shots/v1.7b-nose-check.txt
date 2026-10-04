@@ -1,0 +1,17 @@
+cars/seltos.glb                  rotY=1.57 long-axis=z roof centre -10.0% → nose +z OK
+cars/lacetti.glb                 rotY=0.00 long-axis=z roof centre -8.0% → nose +z OK
+cars/bmw-m3.glb                  rotY=0.00 long-axis=z roof centre -8.8% → nose +z OK
+cars/k5.glb                      rotY=0.00 long-axis=z roof centre -9.0% → nose +z OK
+cars/bmw-m3-competition.glb      rotY=3.14 long-axis=z roof centre -24.5% → nose +z OK
+cars/cobalt.glb                  rotY=3.14 long-axis=z roof centre -7.2% → nose +z OK
+cars/captiva.glb                 rotY=0.00 long-axis=z roof centre -20.3% → nose +z OK
+cars/lada2103.glb                rotY=0.00 long-axis=z roof centre 8.5% → WARN: roof ahead of middle (nose may face -z; see contact sheet)
+traffic/sedan-a.glb              rotY=-1.57 long-axis=z roof centre -6.5% → nose +z OK
+traffic/sedan-b.glb              rotY=0.00 long-axis=z roof centre 1.9% → nose ambiguous (see contact sheet)
+traffic/hatch-a.glb              rotY=-1.57 long-axis=z roof centre -15.4% → nose +z OK
+traffic/hatch-b.glb              rotY=1.57 long-axis=z roof centre -8.2% → nose +z OK
+traffic/van-a.glb                rotY=-1.57 long-axis=z roof centre -7.7% → nose +z OK
+traffic/taxi-a.glb               rotY=-1.57 long-axis=z roof centre 4.6% → WARN: roof ahead of middle (nose may face -z; see contact sheet)
+traffic/cobalt.glb               rotY=3.14 long-axis=z roof centre -8.2% → nose +z OK
+traffic/captiva.glb              rotY=0.00 long-axis=z roof centre -18.9% → nose +z OK
+traffic/lada2103.glb             rotY=0.00 long-axis=z roof centre -1.8% → nose ambiguous (see contact sheet)

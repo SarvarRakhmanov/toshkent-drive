@@ -1,0 +1,28 @@
+<html><body style="margin:0"><script type="importmap">{"imports":{"three":"./three/build/three.module.js","three/addons/":"./three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+const q = new URLSearchParams(location.search);
+const files = q.get("f").split(",");
+const W = 300, H = 300;
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+r.setSize(W * files.length, H); document.body.appendChild(r.domElement);
+r.setScissorTest(true);
+const L = new GLTFLoader(); L.setMeshoptDecoder(MeshoptDecoder);
+let i = 0;
+for (const fr of files) {
+  const [f, rot] = fr.split("@");
+  const g = await L.loadAsync("./models/" + f);
+  g.scene.rotation.y = Number(rot || 0); g.scene.updateMatrixWorld(true);
+  const s = new THREE.Scene(); s.background = new THREE.Color("#cfd8e0");
+  s.add(new THREE.HemisphereLight("#fff", "#555", 2.5));
+  const o = g.scene; const b = new THREE.Box3().setFromObject(o); const sz = b.getSize(new THREE.Vector3()); const c = b.getCenter(new THREE.Vector3());
+  const k = 4 / Math.max(sz.x, sz.z); o.scale.setScalar(k); o.position.sub(c.multiplyScalar(k)); s.add(o);
+  // arrow = model +z
+  s.add(new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 2.2, 0), 2.4, 0xff0000, 0.6, 0.4));
+  const cam = new THREE.PerspectiveCamera(40, W / H, 0.1, 100); cam.position.set(q.get("side") ? 7 : 0.001, q.get("side") ? 1.5 : 9, q.get("side") ? 2.5 : 0); cam.lookAt(0, 0.4, 0);
+  r.setViewport(i * W, 0, W, H); r.setScissor(i * W, 0, W, H); r.render(s, cam); i++;
+}
+document.title = "done";
+</script></body></html>

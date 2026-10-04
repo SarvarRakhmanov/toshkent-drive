@@ -1,0 +1,15 @@
+NPC near-LOD wheel rigs: {"td-npc-near:hatch-a.glb":4}
+NPC wheel spin (rad, 1 s apart): {"td-npc-near:hatch-a.glb":[0.33,5.3]}
+NPC type stats:
+  glb:6        samples=40 maxHeadingErr=0.0° bad=0 sideChecks=185 wrongSide=0 jumps=0 uturnSamples=0
+  glb:0        samples=93 maxHeadingErr=0.0° bad=0 sideChecks=185 wrongSide=0 jumps=0 uturnSamples=0
+  glb:8        samples=82 maxHeadingErr=0.0° bad=0 sideChecks=185 wrongSide=0 jumps=0 uturnSamples=0
+  glb:2        samples=93 maxHeadingErr=0.0° bad=0 sideChecks=185 wrongSide=0 jumps=0 uturnSamples=0
+  bus          samples=46 maxHeadingErr=0.0° bad=0 sideChecks=370 wrongSide=0 jumps=0 uturnSamples=0
+  police       samples=586 maxHeadingErr=0.0° bad=0 sideChecks=1160 wrongSide=0 jumps=0 uturnSamples=135
+  truck        samples=140 maxHeadingErr=0.0° bad=0 sideChecks=370 wrongSide=0 jumps=0 uturnSamples=0
+  jeep         samples=178 maxHeadingErr=0.0° bad=0 sideChecks=370 wrongSide=0 jumps=0 uturnSamples=0
+  policeJeep   samples=276 maxHeadingErr=0.0° bad=0 sideChecks=555 wrongSide=0 jumps=0 uturnSamples=0
+
+ERRORS(0) 
+PASS

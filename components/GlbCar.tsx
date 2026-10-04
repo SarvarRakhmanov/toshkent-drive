@@ -1,6 +1,7 @@
 "use client";
 
-import { useLayoutEffect, useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
+import { useFrame } from "@/lib/safeFrame";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { livePlateMaterial } from "@/lib/plates";
@@ -9,7 +10,7 @@ import { RIDE_HEIGHT } from "@/components/SupercarBody";
 import { PLAYER_CARS, usePlayerCarStore, type PlayerCarDef } from "@/lib/playerCar";
 import { noTransmission } from "@/components/ReadyGate";
 import { coatScene } from "@/lib/weatherCoat";
-import { rigWheels, type WheelRig } from "@/lib/wheelRig";
+import { rigWheels, poseWheels, type WheelRig } from "@/lib/wheelRig";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 /** the active player car's wheel rig (posed by components/Car.tsx) */
@@ -292,12 +293,16 @@ export function PrewarmAssets() {
 
 // CC-BY low-poly traffic cars (see CREDITS.md)
 export const TRAFFIC_MODELS = [
-  { url: "/models/traffic/sedan-a.glb", length: 4.5 },
-  { url: "/models/traffic/sedan-b.glb", length: 4.5 },
-  { url: "/models/traffic/hatch-a.glb", length: 4.1 },
-  { url: "/models/traffic/hatch-b.glb", length: 4.1 },
-  { url: "/models/traffic/van-a.glb", length: 4.9 },
-  { url: "/models/traffic/taxi-a.glb", length: 4.5 },
+  // v1.7b: five of the six original NPC models are authored nose-along-X, so
+  // with rotY 0 they drove SIDEWAYS (crab-walking down the lane). rotY now
+  // turns each nose onto +z (checked with scripts/nose-check.mjs + a side-view
+  // contact sheet, shots/v1.7b-npc-models.png)
+  { url: "/models/traffic/sedan-a.glb", length: 4.5, rotY: -Math.PI / 2 },
+  { url: "/models/traffic/sedan-b.glb", length: 4.5, rotY: 0 },
+  { url: "/models/traffic/hatch-a.glb", length: 4.1, rotY: -Math.PI / 2 },
+  { url: "/models/traffic/hatch-b.glb", length: 4.1, rotY: Math.PI / 2 },
+  { url: "/models/traffic/van-a.glb", length: 4.9, rotY: -Math.PI / 2 },
+  { url: "/models/traffic/taxi-a.glb", length: 4.5, rotY: -Math.PI / 2 },
   // v1.7b NPC LODs of the player Cobalt / Captiva / 2103 (≈6–9k tris, 256 px,
   // palette-baked colours, so no tint)
   { url: "/models/traffic/cobalt.glb", length: 4.48, rotY: Math.PI, noTint: true },
@@ -305,16 +310,55 @@ export const TRAFFIC_MODELS = [
   { url: "/models/traffic/lada2103.glb", length: 4.12, rotY: 0, noTint: true },
 ] as { url: string; length: number; rotY?: number; noTint?: boolean }[];
 
-export function TrafficGlbCar({ index, color }: { index: number; color: string }) {
+const _tp = new THREE.Vector3();
+const NEAR_RIG2 = 38 * 38;
+
+/** NPC car. Far: one merged static body (1–3 draw calls). Within ~38 m of
+ *  the camera (v1.7b) a second copy with rigged wheels is swapped in so the
+ *  wheels visibly roll forward at the car's lane speed (+8 calls, only for
+ *  the one or two cars that close). `speed` is the signed forward m/s. */
+export function TrafficGlbCar({ index, color, speed }: { index: number; color: string; speed?: { current: number } }) {
   const def = TRAFFIC_MODELS[Math.abs(index) % TRAFFIC_MODELS.length];
   const gltf = useGLTF(asset(def.url));
   const taxi = def.url.includes("taxi");
+  const tint = taxi ? "#f2c200" : color;
   const obj = useMemo(() => {
-    const o = prepare(gltf.scene, def.rotY ?? 0, def.length, undefined, taxi ? "#f2c200" : color, !def.noTint, false);
+    const o = prepare(gltf.scene, def.rotY ?? 0, def.length, undefined, tint, !def.noTint, false);
     // v2.1 perf: NPC cars have no wheel rig, so the whole body is static —
     // merge per material look (a queue of 6 at a red light was ~50 calls)
     mergeStaticBody(o, null);
+    o.name = `td-npc:${def.url.split("/").pop()}`;
     return o;
-  }, [gltf, def, color, taxi]);
-  return <primitive object={obj} />;
+  }, [gltf, def, tint]);
+  const near = useRef<{ o: THREE.Object3D; rig: WheelRig | null } | null>(null);
+  const group = useRef<THREE.Group>(null);
+  useFrame(({ camera }, dt) => {
+    const g = group.current;
+    if (!g || !g.parent?.visible) return;
+    g.getWorldPosition(_tp);
+    const close = _tp.distanceToSquared(camera.position) < NEAR_RIG2;
+    if (close && !near.current) {
+      const o = prepare(gltf.scene, def.rotY ?? 0, def.length, undefined, tint, !def.noTint, false);
+      o.position.y += RIDE_HEIGHT;
+      const rig = rigWheels(o, 0.31);
+      o.position.y -= RIDE_HEIGHT;
+      mergeStaticBody(o, rig);
+      o.name = `td-npc-near:${def.url.split("/").pop()}`;
+      near.current = { o, rig };
+      g.add(o);
+      const w = window as unknown as { __tdNpcRigs?: Record<string, unknown> };
+      (w.__tdNpcRigs ??= {})[o.name] = rig ? rig.wheels.length : 0;
+    }
+    if (near.current) {
+      const useNear = close && !!near.current.rig;
+      near.current.o.visible = useNear;
+      obj.visible = !useNear;
+      if (useNear) {
+        poseWheels(near.current.rig!, speed?.current ?? 0, 0, Math.min(dt, 0.05), false, 0);
+        const w = window as unknown as { __tdNpcSpin?: Record<string, number> };
+        (w.__tdNpcSpin ??= {})[near.current.o.name] = near.current.rig!.wheels[0].spin.rotation.x;
+      }
+    }
+  });
+  return <group ref={group}><primitive object={obj} /></group>;
 }

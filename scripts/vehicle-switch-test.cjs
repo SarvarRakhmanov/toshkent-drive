@@ -25,9 +25,9 @@ const OUT = process.env.OUT || "shots", P = process.env.PREFIX || "v1.7b";
   // menu button → vehicle picker (touch + desktop path)
   await page.click("#td-menu-btn"); await page.waitForTimeout(800);
   await page.screenshot({ path: `${OUT}/${P}-menu.png` });
-  await page.click('#td-vehicles [data-car="bike"]'); await page.waitForTimeout(2500); await log("menu → bike");
+  await page.click('#td-vehicles [data-car="bike"]'); await page.waitForTimeout(2500); await log("menu → bike"); await page.screenshot({ path: `${OUT}/${P}-bike.png` });
   await page.click("#td-menu-btn"); await page.waitForTimeout(500);
-  await page.click('#td-vehicles [data-car="seltos"]'); await page.waitForTimeout(3000); await log("menu → seltos (from bike)");
+  await page.click('#td-vehicles [data-car="seltos"]'); await page.waitForTimeout(3000); await log("menu → seltos (from bike)"); await page.screenshot({ path: `${OUT}/${P}-switch-to-car.png` });
   // plate editor: invalid then valid
   await page.click("#td-menu-btn"); await page.waitForTimeout(500);
   for (const [v, tag] of [["01 Q 77 AA", "bad"], ["99 A 777 AA", "region"], ["10 a 123 bc", "ok"]]) {
