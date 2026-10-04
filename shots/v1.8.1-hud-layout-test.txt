@@ -1,0 +1,32 @@
+[desktop-543x388] 15 boxes: #hud@16,12 134x26 | #td-menu-btn@16,42 84x30 | #td-money@106,42 100x30 | #camsel@16,108 195x18 | #sensitivity@16,130 190x30 | #missionhud > div:TAXI — Sar@16,164 152x66 | #waypoint@16,76 216x28 | #td-wanted@299,52 232x53 | #td-tools@302,14 225x27 | #minimap@433,272 100x100 | #speedo@226,294 91x82 | #nitrobar@197,241 150x45 | #helpbtn@16,342 30x30 | #td-fuel@197,276 150x10 | #maphint@343,176 184x12
+PASS [desktop-543x388] no overlapping HUD boxes
+PASS [desktop-543x388] all HUD boxes on screen
+PASS money badge shows ∞ ("$∞")
+PASS bought the Cobalt with $0 and infinite money, money after $0
+PASS infinite money survives reload ("$∞")
+PASS [desktop-543x388] no page errors 
+[desktop-1280x720] 15 boxes: #hud@16,12 174x34 | #td-menu-btn@16,52 84x30 | #td-money@106,52 100x30 | #camsel@16,122 252x22 | #sensitivity@16,150 224x32 | #missionhud > div:TAXI — Azi@16,188 138x66 | #waypoint@16,88 186x28 | #td-wanted@1036,52 232x53 | #td-tools@1039,14 225x27 | #minimap@1084,524 180x180 | #speedo@971,592 99x106 | #nitrobar@898,539 172x45 | #helpbtn@16,674 30x30 | #td-fuel@898,574 172x10 | #maphint@1080,508 184x12
+PASS [desktop-1280x720] no overlapping HUD boxes
+PASS [desktop-1280x720] all HUD boxes on screen
+PASS [desktop-1280x720] no page errors 
+[desktop-800x600] 15 boxes: #hud@16,12 134x28 | #td-menu-btn@16,46 84x30 | #td-money@106,46 100x30 | #camsel@16,116 195x18 | #sensitivity@16,140 190x30 | #missionhud > div:TAXI — Dil@16,176 156x66 | #waypoint@16,82 218x28 | #td-wanted@556,52 232x53 | #td-tools@559,14 225x27 | #minimap@690,484 100x100 | #speedo@355,506 91x82 | #nitrobar@325,453 150x45 | #helpbtn@16,554 30x30 | #td-fuel@325,488 150x10 | #maphint@600,388 184x12
+PASS [desktop-800x600] no overlapping HUD boxes
+PASS [desktop-800x600] all HUD boxes on screen
+PASS [desktop-800x600] no page errors 
+RESULT PASS
+[phone-portrait-390x844] 21 boxes: #hud@10,47 109x32 | #td-menu-btn@10,85 84x30 | #td-money@100,85 100x30 | #missionhud > div:TAXI — Nod@10,151 151x66 | #waypoint@10,121 177x24 | #td-wanted@201,187 179x79 | #minimap@288,89 92x92 | #speedo@157,754 76x56 | #nitrobar@157,710 76x34 | #td-fuel@157,734 76x10 | #tc .tc-btn:@163,47 32x32 | #tc .tc-btn:@200,47 32x32 | #tc .tc-btn:@237,47 32x32 | #tc .tc-btn:LO@274,47 32x32 | #tc .tc-btn:@311,47 32x32 | #tc .tc-btn:@348,47 32x32 | #tc .tc-btn:GAS@316,746 64x64 | #tc .tc-btn:BRAKE@252,754 56x56 | #tc .tc-btn:HB@259,700 42x42 | #tc .tc-btn:N₂O@327,694 42x42 | #tc .tc-steer:◀▶@10,750 128x60
+PASS [phone-portrait-390x844] no overlapping HUD boxes
+PASS [phone-portrait-390x844] all HUD boxes on screen
+PASS money badge shows ∞ ("$∞")
+PASS bought the Cobalt with $0 and infinite money, money after $0
+PASS infinite money survives reload ("$∞")
+PASS [phone-portrait-390x844] no page errors 
+[phone-landscape-844x390] 21 boxes: #hud@47,8 109x32 | #td-menu-btn@47,44 84x30 | #td-money@137,44 100x30 | #missionhud > div:TAXI — Nod@47,106 151x66 | #waypoint@47,78 177x24 | #td-wanted@565,148 232x53 | #minimap@705,50 92x92 | #speedo@384,313 76x56 | #nitrobar@384,269 76x34 | #td-fuel@384,293 76x10 | #tc .tc-btn:@580,8 32x32 | #tc .tc-btn:@617,8 32x32 | #tc .tc-btn:@654,8 32x32 | #tc .tc-btn:LO@691,8 32x32 | #tc .tc-btn:@728,8 32x32 | #tc .tc-btn:@765,8 32x32 | #tc .tc-btn:GAS@733,305 64x64 | #tc .tc-btn:BRAKE@669,313 56x56 | #tc .tc-btn:HB@676,259 42x42 | #tc .tc-btn:N₂O@744,253 42x42 | #tc .tc-steer:◀▶@47,309 128x60
+PASS [phone-landscape-844x390] no overlapping HUD boxes
+PASS [phone-landscape-844x390] all HUD boxes on screen
+PASS [phone-landscape-844x390] no page errors 
+[phone-small-360x640] 21 boxes: #hud@10,24 109x32 | #td-menu-btn@10,62 84x30 | #td-money@100,62 100x30 | #missionhud > div:TAXI — Sar@10,128 152x66 | #waypoint@10,98 182x24 | #td-wanted@184,164 166x79 | #minimap@258,66 92x92 | #speedo@142,570 76x56 | #nitrobar@142,526 76x34 | #td-fuel@142,550 76x10 | #tc .tc-btn:@133,24 32x32 | #tc .tc-btn:@170,24 32x32 | #tc .tc-btn:@207,24 32x32 | #tc .tc-btn:LO@244,24 32x32 | #tc .tc-btn:@281,24 32x32 | #tc .tc-btn:@318,24 32x32 | #tc .tc-btn:GAS@286,562 64x64 | #tc .tc-btn:BRAKE@222,570 56x56 | #tc .tc-btn:HB@229,516 42x42 | #tc .tc-btn:N₂O@297,510 42x42 | #tc .tc-steer:◀▶@10,566 128x60
+PASS [phone-small-360x640] no overlapping HUD boxes
+PASS [phone-small-360x640] all HUD boxes on screen
+PASS [phone-small-360x640] no page errors 
+RESULT PASS
