@@ -14,6 +14,7 @@ import { BigMap } from "@/components/BigMap";
 import { Phone } from "@/components/Phone";
 import { MissionHud } from "@/components/MissionHud";
 import { ServicePanel } from "@/components/ServicePanel";
+import { Ambience } from "@/components/Ambience";
 import { useTouchStore } from "@/lib/touch";
 
 // Speedo/NitroBar/Waypoint each own their own store subscription and are
@@ -249,6 +250,7 @@ export function HUD() {
       <Phone />
       <MissionHud />
       <ServicePanel />
+      <Ambience />
       <WantedHud />
       <PauseMenu />
     </>

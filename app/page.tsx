@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+import { OfflineCache } from "@/components/OfflineCache";
 
 // Canvas/WebGL/Rapier all need the browser — no server render for the game itself.
 // Toshkent Drive: no sign-in; everything is local (localStorage save as "guest").
@@ -29,5 +30,10 @@ export default function Home() {
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => setHasMounted(true), []);
   if (!hasMounted) return null;
-  return <Game />;
+  return (
+    <>
+      <Game />
+      <OfflineCache />
+    </>
+  );
 }
