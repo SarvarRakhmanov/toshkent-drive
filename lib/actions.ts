@@ -68,9 +68,34 @@ export function actionGraphics() {
   hud().showMsg("GRAPHICS: " + useGfxStore.getState().quality.toUpperCase());
 }
 
+/** v1.7b: K / car button / menu pick. Changes the player's car AND puts the
+ *  player in it right away: from a bike, boat, plane, tank or on foot the car
+ *  is brought to the player's spot (lib/safeSpot.ts picks a clear place next
+ *  to it) and becomes the active vehicle. i undefined = next car. */
+export function actionSelectCar(i?: number) {
+  const pc = usePlayerCarStore.getState();
+  if (i === undefined) pc.next(); else pc.select(i);
+  const h = hud();
+  if (h.stolenCar) h.setStolenCar(null);
+  if (h.active !== "car") {
+    const { px, pz, heading } = worldState;
+    // right-hand side of where the player is (same side-step as dismounting)
+    requestCarSummon(px + Math.cos(heading) * 3.2, pz - Math.sin(heading) * 3.2, heading);
+    h.setActive("car");
+  }
+  h.showMsg("CAR: " + PLAYER_CARS[usePlayerCarStore.getState().index].name);
+}
+
 export function actionNextCar() {
-  usePlayerCarStore.getState().next();
-  hud().showMsg("CAR: " + PLAYER_CARS[usePlayerCarStore.getState().index].name);
+  actionSelectCar();
+}
+
+/** menu pick of a non-car vehicle (bike / boat) — same as the B cycle */
+export function actionSelectVehicle(kind: "car" | "bike" | "boat") {
+  if (kind === "car") return actionSelectCar(usePlayerCarStore.getState().index);
+  const h = hud();
+  h.setActive(kind);
+  h.showMsg("SWITCHED TO: " + h.vehicleName());
 }
 
 /** reset / respawn: upright on the nearest road centre-lane, facing along it */

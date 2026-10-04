@@ -124,6 +124,6 @@ export function PerfProbe() {
     last.calls = r.calls; last.triangles = r.triangles; last.points = r.points; last.lines = r.lines;
     last.frames++;
     gl.info.reset();
-  });
+  }, 0, true); // keeps counting while paused (Game.tsx frame watchdog)
   return null;
 }

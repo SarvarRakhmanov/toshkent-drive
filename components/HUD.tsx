@@ -4,6 +4,8 @@ import { useHudStore, CAM_MODES, type CamMode } from "@/lib/hudStore";
 import { useAuthStore } from "@/lib/authStore";
 import { useGfxStore } from "@/lib/gfx";
 import { usePlayerCarStore, PLAYER_CARS } from "@/lib/playerCar";
+import { actionNextCar } from "@/lib/actions";
+import { PauseMenu } from "@/components/PauseMenu";
 import { CreditsPanel, useCreditsStore } from "@/components/CreditsPanel";
 import { saveGame } from "@/lib/saveGame";
 import { Minimap } from "@/components/Minimap";
@@ -107,13 +109,12 @@ function GfxButton() {
   const quality = useGfxStore((s) => s.quality);
   const toggle = useGfxStore((s) => s.toggle);
   const car = usePlayerCarStore((s) => s.index);
-  const nextCar = usePlayerCarStore((s) => s.next);
   return (
     <div id="td-tools">
       <button type="button" onClick={() => { saveGame(); toggle(); }} title="Graphics quality (Q)">
         GFX: {quality === "high" ? "HIGH" : "LOW"}
       </button>
-      <button type="button" onClick={nextCar} title="Change car (K)">
+      <button type="button" onClick={() => actionNextCar()} title="Change car (K)">
         CAR: {PLAYER_CARS[car].name}
       </button>
     </div>
@@ -245,6 +246,7 @@ export function HUD() {
       <BigMap />
       <Phone />
       <MissionHud />
+      <PauseMenu />
     </>
   );
 }

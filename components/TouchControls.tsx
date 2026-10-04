@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { touchInput, clearTouchInput, RELEASE_EVENT, type KeyState } from "@/lib/useKeyboard";
 import { useTouchStore } from "@/lib/touch";
+import { usePauseStore } from "@/lib/pauseStore";
 import { useHudStore, CAM_MODES } from "@/lib/hudStore";
 import { useGfxStore } from "@/lib/gfx";
 import {
@@ -227,6 +228,7 @@ function SettingsMenu({ onClose }: { onClose: () => void }) {
     <div id="tc-menu" onPointerDown={(e) => e.stopPropagation()}>
       {item("ENTER / EXIT (E)", actionUse)}
       {active !== "foot" && item("SWITCH VEHICLE", actionSwitchVehicle)}
+      {item("PAUSE / ALL SETTINGS", () => usePauseStore.getState().setOpen(true))}
       {item("CITY MAP", actionMap)}
       {item("PHONE", actionPhone)}
       {item("WEATHER", actionWeather, false)}

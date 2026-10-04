@@ -22,6 +22,23 @@ const OUT = process.env.OUT || "shots", P = process.env.PREFIX || "v1.7b";
   await page.keyboard.press("KeyK"); await page.waitForTimeout(3000); await log("after K in car");
   await page.keyboard.press("KeyB"); await page.waitForTimeout(2500); await log("after B (bike)");
   await page.keyboard.press("KeyK"); await page.waitForTimeout(3000); await log("after K on bike");
+  // menu button → vehicle picker (touch + desktop path)
+  await page.click("#td-menu-btn"); await page.waitForTimeout(800);
+  await page.screenshot({ path: `${OUT}/${P}-menu.png` });
+  await page.click('#td-vehicles [data-car="bike"]'); await page.waitForTimeout(2500); await log("menu → bike");
+  await page.click("#td-menu-btn"); await page.waitForTimeout(500);
+  await page.click('#td-vehicles [data-car="seltos"]'); await page.waitForTimeout(3000); await log("menu → seltos (from bike)");
+  // plate editor: invalid then valid
+  await page.click("#td-menu-btn"); await page.waitForTimeout(500);
+  for (const [v, tag] of [["01 Q 77 AA", "bad"], ["99 A 777 AA", "region"], ["10 a 123 bc", "ok"]]) {
+    await page.fill("#td-plate-input", v); await page.click("#td-plate-save"); await page.waitForTimeout(300);
+    console.log("plate", JSON.stringify(v), "→", await page.textContent("#td-plate-editor"));
+  }
+  await page.locator("#td-plate-editor").screenshot({ path: `${OUT}/${P}-plate-editor.png` });
+  console.log("stored", await page.evaluate(() => localStorage.getItem("td_plates")));
+  await page.click("#td-menu-btn"); await page.waitForTimeout(500);
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${OUT}/${P}-plate-live.png` });
   console.log(`ERRORS(${errors.length})`, errors.join("\n"));
   await browser.close();
 })().catch((e) => { console.error("FATAL", e); process.exit(1); });

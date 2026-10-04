@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { useFrame as useFrameR3F, type RootState } from "@react-three/fiber";
+import { pauseState } from "@/lib/pauseStore";
 
 // Drop-in replacement for R3F's useFrame. Every per-frame callback in the game
 // goes through here so that:
@@ -18,11 +19,13 @@ export const frameErrors = { count: 0, last: "" };
 type XRFrameArg = Parameters<Parameters<typeof useFrameR3F>[0]>[2];
 type Cb = (state: RootState, delta: number, frame?: XRFrameArg) => void;
 
-export function useFrame(callback: Cb, renderPriority = 0) {
+/** always: keep running while the game is paused (perf probe / watchdog counters) */
+export function useFrame(callback: Cb, renderPriority = 0, always = false) {
   const cbRef = useRef(callback);
   cbRef.current = callback;
   const reported = useRef(false);
   return useFrameR3F((state, delta, frame) => {
+    if (pauseState.paused && !always) return;
     const d = delta > MAX_DT ? MAX_DT : delta > 0 ? delta : 0;
     try {
       cbRef.current(state, d, frame);

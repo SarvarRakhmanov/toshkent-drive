@@ -20,6 +20,7 @@ import type * as THREE from "three";
 import { useFrame } from "@/lib/safeFrame";
 import { Environment } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
+import { usePauseStore } from "@/lib/pauseStore";
 import { EffectComposer, Bloom, N8AO, SMAA } from "@react-three/postprocessing";
 import type { BloomEffect } from "postprocessing";
 import { SkyCycle } from "@/components/SkyCycle";
@@ -132,6 +133,7 @@ function CrashSentinel() {
 }
 
 export default function Game() {
+  const paused = usePauseStore((s) => s.open);
   const quality = useGfxStore((s) => s.quality);
   // restore active vehicle/camera/mute once at mount — vehicle *positions*
   // are restored by each vehicle itself (Car/Bike/Boat read loadSave() in
@@ -175,6 +177,9 @@ export default function Game() {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "TEXTAREA" || (t.tagName === "INPUT" && (t as HTMLInputElement).type === "text"))) return;
       const hud = useHudStore.getState();
+      // v1.7b: Esc toggles the pause menu (after closing map/phone first); keys are ignored while paused
+      if (e.code === "Escape" && !hud.mapOpen && !hud.phoneOpen) { usePauseStore.getState().toggle(); return; }
+      if (usePauseStore.getState().open) return;
       if (e.code === "KeyE") actionUse();
       else if (e.code === "KeyB") actionSwitchVehicle();
       else if (e.code === "KeyC") actionCamera();
@@ -364,7 +369,7 @@ export default function Game() {
               per-frame arcade math, so a fixed 1/60 accumulator only ever
               dropped or doubled their moves (0 steps on some frames at 90/120 Hz,
               2-4 steps per frame on a slow phone) — stutter plus wasted work */}
-          <Physics gravity={[0, -9.81, 0]} timeStep="vary" interpolate={false}>
+          <Physics gravity={[0, -9.81, 0]} timeStep="vary" interpolate={false} paused={paused}>
             <PhysicsProbe />
             {/* stage 0 — what the first frame needs */}
             <group name="City"><City /></group>

@@ -3,6 +3,7 @@
 import { useLayoutEffect, useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { livePlateMaterial } from "@/lib/plates";
 import { asset } from "@/lib/asset";
 import { RIDE_HEIGHT } from "@/components/SupercarBody";
 import { PLAYER_CARS, usePlayerCarStore, type PlayerCarDef } from "@/lib/playerCar";
@@ -112,26 +113,12 @@ function prepare(scene: THREE.Object3D, rotY: number, length: number, paint: Reg
 // Created synchronously (the texture fills in when its 15 KB PNG arrives), so
 // the shader program is identical before/after load and compiles at boot.
 const PLATE_GEO = new THREE.PlaneGeometry(0.52, 0.11);
-const plateMats = new Map<string, THREE.MeshBasicMaterial>();
-function plateMaterial(url: string) {
-  let m = plateMats.get(url);
-  if (!m) {
-    const tex = new THREE.TextureLoader().load(asset(url));
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
-    // polygonOffset + a 1 cm stand-off from the bumper: no z-fighting at any distance
-    m = new THREE.MeshBasicMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-    m.name = "td-plate";
-    plateMats.set(url, m);
-  }
-  return m;
-}
 
 /** Front + rear plates on a prepared car (wrap space: ground y=0, nose +z).
  *  The model's own placeholder plates ("nameplate" material) are hidden; each
  *  plate is raycast onto the body and turned to the surface normal there (so
  *  it follows a slanted tailgate) with a 1.2 cm stand-off: no z-fighting. */
-function addPlates(wrap: THREE.Object3D, plate: NonNullable<PlayerCarDef["plate"]>) {
+function addPlates(wrap: THREE.Object3D, plate: NonNullable<PlayerCarDef["plate"]>, carId: string) {
   wrap.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(wrap);
   const meshes: THREE.Object3D[] = [];
@@ -144,7 +131,7 @@ function addPlates(wrap: THREE.Object3D, plate: NonNullable<PlayerCarDef["plate"
     meshes.push(m);
   });
   const ray = new THREE.Raycaster();
-  const mat = plateMaterial(plate.url);
+  const mat = livePlateMaterial(carId, plate.text); // v1.7b: runtime-drawn, editable in the menu
   const n = new THREE.Vector3();
   for (const side of [1, -1] as const) {
     const y = side > 0 ? plate.frontY : plate.rearY;
@@ -261,7 +248,7 @@ function preparePlayer(def: PlayerCarDef, scene: THREE.Object3D) {
   obj.name = `td-car:${def.id}`;
   obj.position.y += RIDE_HEIGHT; // plates + wheel rig work with the road at world y=0
   const rig = rigWheels(obj, def.phys?.wheelRadius ?? 0.32);
-  if (def.plate) addPlates(obj, def.plate);
+  if (def.plate) addPlates(obj, def.plate, def.id);
   obj.position.y -= RIDE_HEIGHT;
   mergeStaticBody(obj, rig);
   obj.userData.wheelRig = rig;
@@ -294,7 +281,8 @@ export function PrewarmAssets() {
   const gltf = useGLTF(asset(def.url));
   const obj = useMemo(() => {
     const o = preparePlayer(def, gltf.scene);
-    const plate = new THREE.Mesh(PLATE_GEO, plateMaterial(PLAYER_CARS.find((c) => c.plate)!.plate!.url));
+    const pc = PLAYER_CARS.find((c) => c.plate)!;
+    const plate = new THREE.Mesh(PLATE_GEO, livePlateMaterial(pc.id, pc.plate!.text));
     o.add(plate);
     o.visible = false;
     return o;
