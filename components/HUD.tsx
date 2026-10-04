@@ -6,13 +6,13 @@ import { useGfxStore } from "@/lib/gfx";
 import { WantedHud } from "@/components/WantedHud";
 import { usePlayerCarStore, PLAYER_CARS } from "@/lib/playerCar";
 import { actionNextCar } from "@/lib/actions";
-import { PauseMenu } from "@/components/PauseMenu";
+import { MenuButton, PauseMenu } from "@/components/PauseMenu";
 import { CreditsPanel, useCreditsStore } from "@/components/CreditsPanel";
 import { saveGame } from "@/lib/saveGame";
 import { Minimap } from "@/components/Minimap";
 import { BigMap } from "@/components/BigMap";
 import { Phone } from "@/components/Phone";
-import { MissionHud } from "@/components/MissionHud";
+import { MissionHud, MoneyBadge } from "@/components/MissionHud";
 import { ServicePanel } from "@/components/ServicePanel";
 import { Ambience } from "@/components/Ambience";
 import { useTouchStore } from "@/lib/touch";
@@ -138,9 +138,49 @@ export function HUD() {
 
   return (
     <>
-      <div id="hud">
-        <div className="title">TOSHKENT DRIVE</div>
-        <ClockDisplay />
+      {/* v1.8.1: one top-left column — title/clock, MENU + money, camera
+          views, look sensitivity, job panel — stacked so nothing overlaps
+          at any window size (positions come from the flow, not fixed tops) */}
+      <div id="td-topleft">
+        <div id="hud">
+          <div className="title">TOSHKENT DRIVE</div>
+          <ClockDisplay />
+        </div>
+        <div className="td-row">
+          <MenuButton />
+          <MoneyBadge />
+        </div>
+        {!isTouch && (
+          <>
+          <div id="camsel">
+            {CAM_MODES.map((name, i) => (
+              <button
+                key={name}
+                type="button"
+                className={camMode === i ? "on" : ""}
+                onClick={() => setCamMode(i as CamMode)}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+
+          <div id="sensitivity">
+            <label htmlFor="sensSlider">LOOK SENS</label>
+            <input
+              id="sensSlider"
+              type="range"
+              min={0.4}
+              max={2.5}
+              step={0.05}
+              value={lookSensitivity}
+              onChange={(e) => setLookSensitivity(parseFloat(e.target.value))}
+            />
+            <span>{lookSensitivity.toFixed(2)}x</span>
+          </div>
+          </>
+        )}
+        <MissionHud />
       </div>
 
       {!isTouch && <GfxButton />}
@@ -161,33 +201,6 @@ export function HUD() {
 
       {!isTouch && (
       <>
-      <div id="camsel">
-        {CAM_MODES.map((name, i) => (
-          <button
-            key={name}
-            type="button"
-            className={camMode === i ? "on" : ""}
-            onClick={() => setCamMode(i as CamMode)}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
-
-      <div id="sensitivity">
-        <label htmlFor="sensSlider">LOOK SENS</label>
-        <input
-          id="sensSlider"
-          type="range"
-          min={0.4}
-          max={2.5}
-          step={0.05}
-          value={lookSensitivity}
-          onChange={(e) => setLookSensitivity(parseFloat(e.target.value))}
-        />
-        <span>{lookSensitivity.toFixed(2)}x</span>
-      </div>
-
       <button
         id="helpbtn"
         type="button"
@@ -248,7 +261,6 @@ export function HUD() {
       {!isTouch && <div id="maphint">click map for directions</div>}
       <BigMap />
       <Phone />
-      <MissionHud />
       <ServicePanel />
       <Ambience />
       <WantedHud />

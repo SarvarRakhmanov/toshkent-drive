@@ -31,6 +31,8 @@ interface CareerData {
   jobs: number;
   best: Record<string, number>; // race id → best seconds
   levels: Record<string, Levels>; // car id → upgrade levels
+  /** v1.8.1 settings toggle: purchases/fines never reduce money (shows ∞) */
+  infinite: boolean;
 }
 
 interface CareerState extends CareerData {
@@ -44,6 +46,14 @@ interface CareerState extends CareerData {
   levelsFor: (carId: string) => Levels;
   upgradesFor: (carId: string) => Upgrades;
   buy: (carId: string, key: UpgradeKey) => "ok" | "max" | "money";
+  setInfinite: (on: boolean) => void;
+  /** money available to spend (Infinity with the infinite-money toggle) */
+  spendable: () => number;
+}
+
+/** "$1,234" or "∞" */
+export function moneyText(money: number, infinite: boolean): string {
+  return infinite ? "$∞" : `$${money.toLocaleString("en-US")}`;
 }
 
 function key(): string {
@@ -53,7 +63,7 @@ function key(): string {
 function persist(s: CareerData) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(key(), JSON.stringify({ money: s.money, earned: s.earned, jobs: s.jobs, best: s.best, levels: s.levels }));
+    localStorage.setItem(key(), JSON.stringify({ money: s.money, earned: s.earned, jobs: s.jobs, best: s.best, levels: s.levels, infinite: s.infinite }));
   } catch {
     /* storage full / private mode */
   }
@@ -65,6 +75,7 @@ export const useCareer = create<CareerState>((set, get) => ({
   jobs: 0,
   best: {},
   levels: {},
+  infinite: false,
   rev: 0,
   loaded: false,
   load: () => {
@@ -78,6 +89,7 @@ export const useCareer = create<CareerState>((set, get) => ({
         jobs: Math.max(0, Number(d.jobs) || 0),
         best: d.best && typeof d.best === "object" ? d.best : {},
         levels: d.levels && typeof d.levels === "object" ? d.levels : {},
+        infinite: d.infinite === true,
         loaded: true,
         rev: get().rev + 1,
       });
@@ -86,6 +98,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     }
   },
   addMoney: (n) => {
+    if (n < 0 && get().infinite) return; // infinite money: spending is free
     set((s) => ({ money: Math.max(0, Math.round(s.money + n)), earned: s.earned + Math.max(0, Math.round(n)) }));
     persist(get());
   },
@@ -111,9 +124,14 @@ export const useCareer = create<CareerState>((set, get) => ({
     const l = get().levelsFor(carId);
     if (l[k] >= MAX_LEVEL) return "max";
     const cost = UPGRADE_COST[l[k] + 1];
-    if (get().money < cost) return "money";
-    set((s) => ({ money: s.money - cost, levels: { ...s.levels, [carId]: { ...l, [k]: l[k] + 1 } }, rev: s.rev + 1 }));
+    if (get().spendable() < cost) return "money";
+    set((s) => ({ money: s.infinite ? s.money : s.money - cost, levels: { ...s.levels, [carId]: { ...l, [k]: l[k] + 1 } }, rev: s.rev + 1 }));
     persist(get());
     return "ok";
   },
+  setInfinite: (on) => {
+    set({ infinite: on });
+    persist(get());
+  },
+  spendable: () => (get().infinite ? Infinity : get().money),
 }));

@@ -96,7 +96,7 @@ export function persistEcon(force = false) {
 }
 const pay = (n: number) => {
   const c = useCareer.getState();
-  if (c.money < n) return false;
+  if (c.spendable() < n) return false;
   c.addMoney(-n);
   return true;
 };
@@ -136,7 +136,7 @@ export const useEconomy = create<EconState>((set, get) => ({
     if (!sp.kinds.includes(kind)) return "kind";
     const need = sp.tank - fuelOf(id);
     if (need < 0.5) return "full";
-    const money = useCareer.getState().money;
+    const money = useCareer.getState().spendable();
     const litres = Math.min(need, money / FUEL_PRICE[kind]);
     if (litres < 0.5) return "money";
     const cost = Math.max(1, Math.round(litres * FUEL_PRICE[kind]));
@@ -149,7 +149,7 @@ export const useEconomy = create<EconState>((set, get) => ({
   // fuel van: $40 for 10 L — free when broke, so nobody is ever stranded
   rescue: (id) => {
     const c = useCareer.getState();
-    const cost = Math.min(RESCUE_PRICE, c.money);
+    const cost = Math.min(RESCUE_PRICE, c.spendable());
     c.addMoney(-cost);
     fuelTank[id] = Math.min(fuelSpec(id).tank, fuelOf(id) + RESCUE_LITRES);
     persistEcon(true);

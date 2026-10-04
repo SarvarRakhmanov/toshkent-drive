@@ -8,7 +8,7 @@ import { cycleWeather } from "@/lib/weatherState";
 import { LANDMARKS } from "@/lib/landmarks";
 import { useMissions, type MissionKind, isNightHour, NIGHT_PAY } from "@/lib/missions";
 import { STATIONS, HOUSES, DEALER, pumpSpot, houseSpot, useEconomy } from "@/lib/economy";
-import { useCareer, UPGRADE_KEYS, UPGRADE_LABEL, UPGRADE_COST, MAX_LEVEL } from "@/lib/career";
+import { useCareer, moneyText, UPGRADE_KEYS, UPGRADE_LABEL, UPGRADE_COST, MAX_LEVEL } from "@/lib/career";
 import { PLAYER_CARS, usePlayerCarStore } from "@/lib/playerCar";
 import { saveGame } from "@/lib/saveGame";
 
@@ -27,6 +27,7 @@ export function Phone() {
   const showMsg = useHudStore((s) => s.showMsg);
   const mission = useMissions((s) => s.m);
   const money = useCareer((s) => s.money);
+  const infinite = useCareer((s) => s.infinite);
   const levels = useCareer((s) => s.levels);
   const carIdx = usePlayerCarStore((s) => s.index);
   if (!open) return null;
@@ -68,7 +69,7 @@ export function Phone() {
           <span style={hintStyle}>deliver my car here</span>
         </button>
 
-        <div style={{ margin: "10px 0 4px", color: "#6a7280", fontSize: 11, letterSpacing: 1 }}>JOBS · <span style={{ color: "#9dff6a" }}>${money.toLocaleString("en-US")}</span></div>
+        <div style={{ margin: "10px 0 4px", color: "#6a7280", fontSize: 11, letterSpacing: 1 }}>JOBS · <span style={{ color: "#9dff6a" }}>{moneyText(money, infinite)}</span></div>
         {mission ? (
           <button type="button" id="job-cancel" onClick={() => { useMissions.getState().cancel(); setPhoneOpen(false); }} style={{ ...btnStyle, color: "#ff6a5f" }}>
             ✖ Cancel: {mission.title}

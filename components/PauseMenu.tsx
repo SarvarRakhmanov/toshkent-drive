@@ -1,5 +1,6 @@
 "use client";
 
+import { useCareer } from "@/lib/career";
 import { useEconomy, CAR_PRICE } from "@/lib/economy";
 import { useEffect } from "react";
 import { usePauseStore } from "@/lib/pauseStore";
@@ -35,6 +36,7 @@ export function PauseMenu() {
   const owned = useEconomy((s) => s.owned);
   const econLoaded = useEconomy((s) => s.loaded);
   const home = useEconomy((s) => s.home);
+  const infinite = useCareer((s) => s.infinite);
   const quality = useGfxStore((s) => s.quality);
 
   // silence the engine while paused
@@ -50,25 +52,6 @@ export function PauseMenu() {
 
   return (
     <>
-      <button
-        id="td-menu-btn"
-        type="button"
-        aria-label="Menu / pause (Esc)"
-        title="Menu / pause (Esc)"
-        onClick={() => usePauseStore.getState().toggle()}
-        style={{
-          position: "fixed", zIndex: 30, left: "var(--sl, 12px)", top: "calc(var(--st, 8px) + 72px)",
-          height: 34, minWidth: 34, padding: "0 11px", borderRadius: 9, display: "flex", alignItems: "center", gap: 6,
-          background: open ? "rgba(255,215,106,0.55)" : "rgba(12,16,30,0.62)", border: "1.5px solid rgba(255,255,255,0.45)",
-          color: open ? "#14161d" : "#fff", font: "800 11px/1 system-ui, sans-serif", letterSpacing: 1, cursor: "pointer",
-          touchAction: "manipulation", pointerEvents: "auto",
-        }}
-      >
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-          {open ? <path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor" /> : <path d="M4 6h16v2.4H4zM4 10.8h16v2.4H4zM4 15.6h16V18H4z" fill="currentColor" />}
-        </svg>
-        {open ? "PAUSED" : "MENU"}
-      </button>
       {open && (
         <div
           id="td-pause"
@@ -96,6 +79,9 @@ export function PauseMenu() {
             <button type="button" style={btn} onClick={run(actionGraphics, true)}>GRAPHICS: {quality === "high" ? "HIGH" : "LOW"}</button>
             <button type="button" style={btn} onClick={run(actionWeather, true)}>CHANGE WEATHER</button>
             <button type="button" style={btn} onClick={run(actionMute, true)}>SOUND ON / OFF</button>
+            <button type="button" id="td-infmoney" style={infinite ? sel : btn} onClick={run(() => { const c = useCareer.getState(); c.setInfinite(!c.infinite); useHudStore.getState().showMsg(c.infinite ? "INFINITE MONEY: OFF" : "INFINITE MONEY: ON"); }, true)}>
+              INFINITE MONEY: {infinite ? "ON ∞" : "OFF"}
+            </button>
             <button type="button" style={btn} onClick={run(actionResetCar)}>RESET CAR</button>
             <button type="button" id="td-gohome" style={btn} onClick={run(actionGoHome)}>{home ? "GO HOME" : "GO HOME (buy a home first)"}</button>
             <button type="button" style={btn} onClick={run(actionMap)}>CITY MAP</button>
@@ -106,5 +92,30 @@ export function PauseMenu() {
         </div>
       )}
     </>
+  );
+}
+
+/** v1.8.1: the MENU button lives in the HUD's top-left column (components/HUD.tsx) */
+export function MenuButton() {
+  const open = usePauseStore((s) => s.open);
+  return (
+      <button
+        id="td-menu-btn"
+        type="button"
+        aria-label="Menu / pause (Esc)"
+        title="Menu / pause (Esc)"
+        onClick={() => usePauseStore.getState().toggle()}
+        style={{
+                    flex: "none", height: 30, minWidth: 34, padding: "0 11px", borderRadius: 9, display: "flex", alignItems: "center", gap: 6,
+          background: open ? "rgba(255,215,106,0.55)" : "rgba(12,16,30,0.62)", border: "1.5px solid rgba(255,255,255,0.45)",
+          color: open ? "#14161d" : "#fff", font: "800 11px/1 system-ui, sans-serif", letterSpacing: 1, cursor: "pointer",
+          touchAction: "manipulation", pointerEvents: "auto",
+        }}
+      >
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          {open ? <path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor" /> : <path d="M4 6h16v2.4H4zM4 10.8h16v2.4H4zM4 15.6h16V18H4z" fill="currentColor" />}
+        </svg>
+        {open ? "PAUSED" : "MENU"}
+      </button>
   );
 }

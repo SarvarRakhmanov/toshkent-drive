@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useHudStore } from "@/lib/hudStore";
 import { worldState } from "@/lib/worldState";
 import { PLAYER_CARS, usePlayerCarStore } from "@/lib/playerCar";
-import { useCareer } from "@/lib/career";
+import { useCareer, moneyText } from "@/lib/career";
 import { engineTelemetry } from "@/lib/vehicleDynamics";
 import {
   STATIONS, HOUSES, DEALER, CAR_PRICE, FUEL_PRICE, FUEL_LABEL, RESCUE_PRICE, RESCUE_LITRES,
@@ -23,7 +23,9 @@ export function ServicePanel() {
   const stolen = useHudStore((s) => s.stolenCar);
   const showMsg = useHudStore((s) => s.showMsg);
   const carIdx = usePlayerCarStore((s) => s.index);
-  const money = useCareer((s) => s.money);
+  const realMoney = useCareer((s) => s.money);
+  const infinite = useCareer((s) => s.infinite);
+  const money = infinite ? Infinity : realMoney;
   const econ = useEconomy();
   const [, tick] = useState(0);
   const [ctx, setCtx] = useState<Ctx>({ kind: "none" });
@@ -54,7 +56,7 @@ export function ServicePanel() {
   const panel = (title: string, body: React.ReactNode) => (
     <div id="td-service" style={{ position: "fixed", right: "calc(var(--sr, 8px) + 8px)", top: "calc(var(--st, 8px) + 150px)", width: "min(250px, 46vw)", zIndex: 22, background: "rgba(10,14,22,0.9)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12, padding: 10, color: "#eef1f6", font: "600 12px/1.3 system-ui, sans-serif", pointerEvents: "auto", maxHeight: "60vh", overflowY: "auto" }} onPointerDown={(e) => e.stopPropagation()}>
       <div style={{ fontWeight: 900, letterSpacing: 1, color: "#ffd76a", marginBottom: 4 }}>{title}</div>
-      <div style={{ color: "#9dff6a", marginBottom: 4 }}>${money.toLocaleString("en-US")}</div>
+      <div style={{ color: "#9dff6a", marginBottom: 4 }}>{moneyText(realMoney, infinite)}</div>
       {body}
     </div>
   );

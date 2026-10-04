@@ -319,3 +319,14 @@ html.td-touch #vig { background: radial-gradient(ellipse at center, transparent 
   margin-top: 6px; background: none; border: 1px solid rgba(255,255,255,0.3); color: #ffd166;
   border-radius: 6px; padding: 2px 8px; cursor: pointer; font: inherit; pointer-events: auto;
 }
+
+/* ==== v1.8.1 top-left HUD column: everything stacks in normal flow ==== */
+#td-topleft { position: fixed; z-index: 30; left: var(--sl, 16px); top: var(--st, 12px); display: flex; flex-direction: column; align-items: flex-start; gap: 6px; pointer-events: none; max-width: calc(100vw - var(--sl, 16px) - 140px); }
+#td-topleft #hud, #td-topleft #camsel, #td-topleft #sensitivity { position: static; top: auto; left: auto; }
+#td-topleft #camsel, #td-topleft #sensitivity { pointer-events: auto; flex-wrap: wrap; }
+#td-topleft .td-row { display: flex; align-items: center; gap: 6px; }
+@media (max-height: 420px) {
+  #td-topleft { gap: 4px; }
+  #td-topleft #clock { margin-top: 0; }
+}
+html.td-touch #td-wanted { top: calc(var(--st) + 140px) !important; }

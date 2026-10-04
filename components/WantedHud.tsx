@@ -9,7 +9,7 @@ export function WantedHud() {
   const evade = useWanted((s) => Math.floor(s.evade));
   if (!level) return null;
   return (
-    <div id="td-wanted" style={{ position: "fixed", top: "calc(var(--st, 8px) + 92px)", left: "50%", transform: "translateX(-50%)", zIndex: 21, pointerEvents: "none", textAlign: "center", font: "800 12px/1.2 system-ui, sans-serif", color: "#fff", textShadow: "0 1px 3px #000" }}>
+    <div id="td-wanted" style={{ position: "fixed", top: "calc(var(--st, 8px) + 44px)", right: "var(--sr, 12px)", maxWidth: "46vw", zIndex: 21, pointerEvents: "none", textAlign: "center", font: "800 12px/1.2 system-ui, sans-serif", color: "#fff", textShadow: "0 1px 3px #000" }}>
       <div style={{ fontSize: 22, letterSpacing: 3, color: "#ffd23f" }}>
         {"★".repeat(level)}<span style={{ color: "rgba(255,255,255,0.28)" }}>{"★".repeat(MAX_STARS - level)}</span>
       </div>
