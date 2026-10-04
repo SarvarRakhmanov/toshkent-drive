@@ -25,7 +25,7 @@ const SPOTS = [
     await page.evaluate(([y, p]) => window.__td.look(y, p), [yaw, pitch]); await page.waitForTimeout(3000);
     const r = await page.evaluate(() => { const p = window.__tdPerf(); return { calls: p.calls, tris: p.triangles, top: window.__tdDraw(true).slice(0, 6), car: window.__td.car() }; });
     console.log(n, "calls", r.calls, "tris", r.tris, JSON.stringify(r.top), JSON.stringify(r.car));
-    await page.screenshot({ path: `${OUT}/${P}-${n}.png` });
+    await page.screenshot({ path: `${OUT}/${P}-${n}.png`, timeout: 180000 });
   }
   console.log(`ERRORS(${errors.length})`, errors.slice(0, 8).join("\n"));
   await b.close();
