@@ -330,3 +330,9 @@ html.td-touch #vig { background: radial-gradient(ellipse at center, transparent 
   #td-topleft #clock { margin-top: 0; }
 }
 html.td-touch #td-wanted { top: calc(var(--st) + 140px) !important; }
+#td-topleft #waypoint, html.td-touch #td-topleft #waypoint { position: static; top: auto; left: auto; transform: none; max-width: min(230px, 100%); }
+#td-topleft #waypoint .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* touch: the title row stays left of the top-right button bar; the next rows start below that bar */
+html.td-touch #td-topleft #hud { min-height: 32px; }
+html.td-touch #td-topleft { max-width: calc(100vw - var(--sl) - var(--sr) - 112px); }
+html.td-touch #td-fuel span { display: none; }

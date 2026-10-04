@@ -129,17 +129,33 @@ export function ServicePanel() {
 
   return (
     <>
-      {inCar && spec && (
-        <div id="td-fuel" style={{ position: "fixed", left: "calc(50% + 56px)", bottom: "calc(var(--sb, 6px) + 30px)", zIndex: 20, pointerEvents: "none", display: "flex", alignItems: "center", gap: 6, padding: "3px 8px", borderRadius: 8, background: "rgba(0,0,0,0.45)", color: pct < 0.15 ? "#ff6a5f" : "#eef1f6", font: "800 11px/1 system-ui, sans-serif" }}>
-          ⛽
-          <div style={{ width: 70, height: 7, borderRadius: 4, background: "rgba(255,255,255,0.2)", overflow: "hidden" }}>
-            <div style={{ width: `${Math.round(pct * 100)}%`, height: "100%", background: pct < 0.15 ? "#ff4a3d" : pct < 0.35 ? "#ffc93d" : "#5fdc6a" }} />
-          </div>
-          {litres.toFixed(0)} L
-          {dmg > 0.05 && <span style={{ color: "#ffb36a" }}>🔧{Math.round(dmg * 100)}%</span>}
-        </div>
-      )}
       {view}
     </>
+  );
+}
+
+/** v1.8.1: fuel gauge row, drawn inside the NITRO box (components/HUD.tsx) so
+ *  it moves with it and can never sit on top of the pedals or the minimap */
+export function FuelGauge() {
+  const active = useHudStore((s) => s.active);
+  const stolen = useHudStore((s) => s.stolenCar);
+  const carIdx = usePlayerCarStore((s) => s.index);
+  const [, tick] = useState(0);
+  useEffect(() => { const id = setInterval(() => tick((t) => t + 1), 500); return () => clearInterval(id); }, []);
+  const car = PLAYER_CARS[carIdx];
+  if (active !== "car" || stolen || !car) return null;
+  const spec = fuelSpec(car.id);
+  const litres = fuelOf(car.id);
+  const pct = litres / spec.tank;
+  const dmg = engineTelemetry.damage;
+  return (
+    <div id="td-fuel" style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, color: pct < 0.15 ? "#ff6a5f" : "#eef1f6", font: "800 10px/1 system-ui, sans-serif", textShadow: "0 1px 3px #000", whiteSpace: "nowrap" }}>
+      ⛽
+      <div style={{ flex: 1, minWidth: 20, height: 6, borderRadius: 4, background: "rgba(255,255,255,0.2)", overflow: "hidden" }}>
+        <div style={{ width: `${Math.round(pct * 100)}%`, height: "100%", background: pct < 0.15 ? "#ff4a3d" : pct < 0.35 ? "#ffc93d" : "#5fdc6a" }} />
+      </div>
+      {litres.toFixed(0)}L
+      {dmg > 0.05 && <span style={{ color: "#ffb36a" }}>🔧{Math.round(dmg * 100)}%</span>}
+    </div>
   );
 }

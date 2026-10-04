@@ -13,7 +13,7 @@ import { Minimap } from "@/components/Minimap";
 import { BigMap } from "@/components/BigMap";
 import { Phone } from "@/components/Phone";
 import { MissionHud, MoneyBadge } from "@/components/MissionHud";
-import { ServicePanel } from "@/components/ServicePanel";
+import { ServicePanel, FuelGauge } from "@/components/ServicePanel";
 import { Ambience } from "@/components/Ambience";
 import { useTouchStore } from "@/lib/touch";
 
@@ -60,6 +60,7 @@ function NitroBar() {
       <div className="ntrack">
         <div className="nfill" style={{ width: `${(nitroFuel * 100).toFixed(1)}%` }} />
       </div>
+      <FuelGauge />
     </div>
   );
 }
@@ -150,6 +151,7 @@ export function HUD() {
           <MenuButton />
           <MoneyBadge />
         </div>
+        <Waypoint />
         {!isTouch && (
           <>
           <div id="camsel">
@@ -187,7 +189,6 @@ export function HUD() {
 
       <Speedo />
       <NitroBar />
-      <Waypoint />
 
       {hint && (
         <div id="hint" style={{ display: "block" }}>
