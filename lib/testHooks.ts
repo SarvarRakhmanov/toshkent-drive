@@ -16,11 +16,18 @@ import { signalFor, signalTime } from "@/lib/trafficSignals";
 import { useMissions, type MissionKind } from "@/lib/missions";
 import { useCareer } from "@/lib/career";
 import { weatherState } from "@/lib/weatherState";
+import { carSummon } from "@/lib/vehicleSummon";
+import { carSafety, carWorldRef } from "@/components/Car";
+import { isClear } from "@/lib/safeSpot";
 import { skyState } from "@/lib/skyState";
 
 if (typeof window !== "undefined") {
   (window as unknown as { __td: unknown }).__td = {
     summonCar: (x: number, z: number, h: number) => requestCarSummon(x, z, h),
+    // v1.6.1: place the car EXACTLY there (no safe-spot search) — stuck tests
+    forceCar: (x: number, z: number, h: number) => { requestCarSummon(x, z, h); carSummon.raw = true; },
+    safety: () => ({ ...carSafety }),
+    clear: (x: number, z: number, h = 0, ahead = 0) => (carWorldRef.world ? isClear(carWorldRef.world, x, z, h, ahead) : null),
     traffic: () => trafficPositions.map((t) => ({ x: t.x, z: t.z, h: t.h, police: t.police, stolen: t.stolen, kind: t.kind ?? null })),
     car: () => ({ ...vehicleState.car }),
     load: () => { const s = useLoadStore.getState(); return { phase: s.phase, progress: s.progress, stage: s.stage, readyAt: s.readyAt }; },

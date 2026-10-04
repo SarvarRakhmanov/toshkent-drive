@@ -220,10 +220,21 @@ canvas { touch-action: none; }
 
 /* ==== touch devices (html.td-touch, set by lib/touch.ts) ==== */
 html.td-touch {
-  --sl: max(10px, env(safe-area-inset-left));
-  --sr: max(10px, env(safe-area-inset-right));
-  --st: max(8px, env(safe-area-inset-top));
-  --sb: max(14px, env(safe-area-inset-bottom));
+  /* v1.6.1: env() + Capacitor's injected --safe-area-inset-* + our own
+     native --app-inset-* (MainActivity.pushInsets: nav bar / cutout / any
+     part of the WebView outside the visible screen) — whichever is largest */
+  --sl: max(10px, env(safe-area-inset-left), var(--safe-area-inset-left, 0px), var(--app-inset-left, 0px));
+  --sr: max(10px, env(safe-area-inset-right), var(--safe-area-inset-right, 0px), var(--app-inset-right, 0px));
+  --st: max(8px, env(safe-area-inset-top), var(--safe-area-inset-top, 0px), var(--app-inset-top, 0px));
+  --sb: max(14px, env(safe-area-inset-bottom), var(--safe-area-inset-bottom, 0px), var(--app-inset-bottom, 0px));
+}
+/* phones/tablets in landscape: rounded corners + camera cutout eat the edges */
+@media (orientation: landscape) {
+  html.td-touch {
+    --sl: max(26px, env(safe-area-inset-left), var(--safe-area-inset-left, 0px), var(--app-inset-left, 0px));
+    --sr: max(26px, env(safe-area-inset-right), var(--safe-area-inset-right, 0px), var(--app-inset-right, 0px));
+    --sb: max(18px, env(safe-area-inset-bottom), var(--safe-area-inset-bottom, 0px), var(--app-inset-bottom, 0px));
+  }
 }
 html.td-touch #hud { top: var(--st); left: var(--sl); }
 html.td-touch #hud .title { font-size: 10px; letter-spacing: 1.5px; }

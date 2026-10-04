@@ -5,7 +5,7 @@
 // it) when they place the call. Car.tsx checks this unconditionally instead,
 // same as its own tank-shell-destroy/respawn blocks already do regardless
 // of isActive.
-export const carSummon = { pending: false, x: 0, z: 0, h: 0 };
+export const carSummon = { pending: false, x: 0, z: 0, h: 0, raw: false }; // raw: test hook, skip the safe-spot search
 
 export function requestCarSummon(x: number, z: number, h: number) {
   carSummon.pending = true;

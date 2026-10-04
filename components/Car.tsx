@@ -30,6 +30,14 @@ import { usePlayerCarStore, PLAYER_CARS } from "@/lib/playerCar";
 import { useCareer } from "@/lib/career";
 import { QueryFilterFlags, type KinematicCharacterController } from "@dimforge/rapier3d-compat";
 import { tmpQuat, AXIS_Y } from "@/lib/scratch";
+import { isClear, findSafeSpot } from "@/lib/safeSpot";
+import { isReady } from "@/lib/loadState";
+
+/** v1.6.1: throttle held with no real movement for this long → reposition */
+const STUCK_SECONDS = 3;
+export const carSafety = { spawnChecked: false, relocations: 0, unstucks: 0, last: "" };
+/** test hook access (lib/testHooks.ts clear()) */
+export const carWorldRef: { world: import("@dimforge/rapier3d-compat").World | null } = { world: null };
 
 const GRAVITY_PULL = -12; // m/s^2 fed into the character controller so it stays snapped to the ground
 const NITRO_MAX = 10; // seconds of fuel — same numbers as the original's NITRO_MAX/NITRO_BOOST
@@ -67,6 +75,10 @@ export function Car() {
   const visBody = useRef<THREE.Group>(null);
   const specCache = useRef<{ index: number; rev: number; spec: VehicleSpec } | null>(null);
   const controllerRef = useRef<KinematicCharacterController | null>(null);
+  // v1.6.1 auto-unstuck: game time the throttle has been held without the
+  // car actually getting anywhere (t0, 0 = idle), and where that window started
+  const stuck = useRef({ t0: 0, x: 0, z: 0 });
+  const spawnChecked = useRef(false);
 
   useEffect(() => {
     const controller = world.createCharacterController(0.02);
@@ -93,23 +105,53 @@ export function Car() {
     const d = Math.min(dt, 0.05); // clamp like the original tick() to avoid a tab-switch spike
 
     const isActive = useHudStore.getState().active === "car";
+    carWorldRef.world = world;
 
     // "call mechanic" phone summon (components/Phone.tsx, lib/vehicleSummon.ts)
     // — unconditional, unlike the club-door teleportRequest below: the whole
     // point is bringing the car to a player who is on foot, i.e. NOT driving
     // it, so gating this on isActive would make it a no-op every time.
-    if (carSummon.pending) {
-      carSummon.pending = false;
+    // v1.6.1: put the car on a spot with nothing solid around it (and a
+    // clear run-up ahead) — start spawn, reset, mechanic call, auto-unstuck
+    const placeAt = (x: number, z: number, h: number, why: string, raw = false) => {
+      const p = raw ? { x, z, h } : findSafeSpot(world, x, z, h, collider);
       destroyedUntil.current = 0;
-      dyn.current = newDynState(); // a reset / mechanic call also repairs the car
-      body.setTranslation({ x: carSummon.x, y: RIDE_HEIGHT, z: carSummon.z }, true);
-      car.current.h = carSummon.h;
+      body.setTranslation({ x: p.x, y: groundYAt(p.x, p.z) + RIDE_HEIGHT, z: p.z }, true);
+      body.setNextKinematicTranslation({ x: p.x, y: groundYAt(p.x, p.z) + RIDE_HEIGHT, z: p.z });
+      car.current.h = p.h;
       car.current.speed = 0;
       car.current.vLat = 0;
-      vehicleState.car.x = carSummon.x;
-      vehicleState.car.z = carSummon.z;
-      vehicleState.car.h = carSummon.h;
+      car.current.steerAng = 0;
+      fallSpeed.current = 0;
+      restFrames.current = 0;
+      vehicleState.car.x = p.x;
+      vehicleState.car.z = p.z;
+      vehicleState.car.h = p.h;
+      if (isActive) { worldState.px = p.x; worldState.pz = p.z; worldState.heading = p.h; }
+      stuck.current.t0 = 0;
+      carSafety.relocations++;
+      carSafety.last = `${why} -> ${p.x.toFixed(1)},${p.z.toFixed(1)}`;
+    };
+
+    if (carSummon.pending) {
+      carSummon.pending = false;
+      dyn.current = newDynState(); // a reset / mechanic call also repairs the car
+      placeAt(carSummon.x, carSummon.z, carSummon.h, "summon", carSummon.raw);
+      carSummon.raw = false;
       return;
+    }
+
+    // start spawn (fresh game or a saved position): once the world is up,
+    // make sure the car isn't parked inside / against a collider
+    if (!spawnChecked.current && isReady()) {
+      spawnChecked.current = true;
+      carSafety.spawnChecked = true;
+      const t0 = body.translation();
+      if (!isClear(world, t0.x, t0.z, car.current.h, 6, collider)) {
+        dyn.current = newDynState();
+        placeAt(t0.x, t0.z, car.current.h, "spawn");
+        return;
+      }
     }
 
     // club door teleport (enter/exit VENU) — see lib/club.ts
@@ -332,6 +374,25 @@ export function Car() {
       return;
     }
 
+
+    // v1.6.1 auto-unstuck: GAS (or reverse) held for STUCK_SECONDS of game
+    // time while the car is crawling (<0.6 m/s, e.g. the sweep keeps eating
+    // the move) and has gone < 0.75 m — then hop/reposition to a clear spot
+    if (isActive && (k.forward || k.back) && !k.handbrake && Math.abs(car.current.speed) < 0.6) {
+      const sk = stuck.current;
+      if (sk.t0 === 0 || Math.hypot(nextPos.x - sk.x, nextPos.z - sk.z) > 0.75) { sk.t0 = 1e-6; sk.x = nextPos.x; sk.z = nextPos.z; }
+      else if ((sk.t0 += d) > STUCK_SECONDS) {
+        carSafety.unstucks++;
+        const dmg = dyn.current.damage;
+        dyn.current = newDynState();
+        dyn.current.damage = Math.min(dmg, 0.5);
+        // first try a short hop forward/back of where it is, else the nearest clear spot
+        const dir = k.back && !k.forward ? -1 : 1;
+        placeAt(nextPos.x + Math.sin(car.current.h) * 3 * dir, nextPos.z + Math.cos(car.current.h) * 3 * dir, car.current.h, "unstuck");
+        useHudStore.getState().showMsg("UNSTUCK");
+        return;
+      }
+    } else stuck.current.t0 = 0;
 
     body.setNextKinematicTranslation(nextPos);
 
