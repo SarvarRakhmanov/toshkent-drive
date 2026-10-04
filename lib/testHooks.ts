@@ -23,7 +23,7 @@ import { carSafety, carWorldRef } from "@/components/Car";
 import { isClear } from "@/lib/safeSpot";
 import { skyState } from "@/lib/skyState";
 import { ambienceState } from "@/lib/ambience";
-import { fuelOf, fuelSpec, fuelTank, useEconomy, STATIONS, HOUSES, pumpSpot, houseSpot } from "@/lib/economy";
+import { fuelOf, fuelSpec, fuelTank, useEconomy, carRepair, STATIONS, HOUSES, pumpSpot, houseSpot } from "@/lib/economy";
 import { PLAYER_CARS, usePlayerCarStore } from "@/lib/playerCar";
 import { engineTelemetry } from "@/lib/vehicleDynamics";
 
@@ -56,6 +56,7 @@ if (typeof window !== "undefined") {
     // v1.8 economy
     fuel: () => { const id = PLAYER_CARS[usePlayerCarStore.getState().index]?.id ?? ""; return { id, litres: fuelOf(id), tank: fuelSpec(id).tank, damage: engineTelemetry.damage }; },
     setFuel: (l: number) => { const id = PLAYER_CARS[usePlayerCarStore.getState().index]?.id ?? ""; fuelTank[id] = l; },
+    damage: (v: number) => { carRepair.set = v; },
     econ: () => { const e = useEconomy.getState(); return { owned: e.owned, houses: e.houses, home: e.home, loaded: e.loaded }; },
     stations: () => STATIONS.map((s) => ({ ...s, pump: pumpSpot(s) })),
     houses: () => HOUSES.map((h) => ({ ...h, spot: houseSpot(h) })),

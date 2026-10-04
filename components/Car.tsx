@@ -237,6 +237,7 @@ export function Car() {
     const metered = isActive && !useHudStore.getState().stolenCar && !!fuelId;
     const hasFuel = !metered || fuelOf(fuelId) > 0;
     if (isActive && carRepair.pending) { carRepair.pending = false; dyn.current.damage = 0; }
+    if (isActive && carRepair.set >= 0) { dyn.current.damage = carRepair.set; carRepair.set = -1; }
     rampSteer(car.current, steer, hb, d);
     const bt = body.translation();
     const { dx, dz } = stepDynamics(

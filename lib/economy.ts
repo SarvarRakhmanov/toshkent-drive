@@ -159,5 +159,5 @@ export const useEconomy = create<EconState>((set, get) => ({
 }));
 
 /** one-shot repair request, consumed by Car.tsx (which owns the damage state) */
-export const carRepair = { pending: false };
+export const carRepair = { pending: false, set: -1 }; // set: test hook, force damage 0..1
 export const repairCost = (damage: number) => (damage < 0.02 ? 0 : Math.round(REPAIR_BASE + damage * REPAIR_PER));
