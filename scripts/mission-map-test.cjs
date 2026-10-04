@@ -23,8 +23,10 @@ const URL = process.env.URL || `http://127.0.0.1:4173/toshkent-drive/?autoq=0&wd
       m = await page.evaluate(() => window.__td.mission());
       if (!m) break;
       const t = m.target;
-      await page.evaluate(([x, z]) => window.__td.forceCar(x, z, 0), [t.x, t.z]); await page.waitForTimeout(2500);
+      // probe the target BEFORE the car is on it (its own collider would block the probe)
+      await page.evaluate(([x, z]) => window.__td.forceCar(x + 0.5, z + 14, 0), [t.x, t.z]); await page.waitForTimeout(3000);
       const clear = await page.evaluate(([x, z]) => window.__td.clear(x, z, 0, 0), [t.x, t.z]);
+      await page.evaluate(([x, z]) => window.__td.forceCar(x, z, 0), [t.x, t.z]); await page.waitForTimeout(2500);
       await page.waitForTimeout(2500);
       const m2 = await page.evaluate(() => window.__td.mission());
       const advanced = !m2 || m2.stage > m.stage || m2.kind !== m.kind;

@@ -1,0 +1,18 @@
+taxi targets 2
+  stage 0 target 56,222 "Pick up Dilnoza" clear=true advanced=true
+  stage 1 target -378,-44 "Drop Dilnoza off" clear=true advanced=true
+  taxi: money 0 -> 296
+delivery targets 2
+  stage 0 target -144,20 "Collect at TOWER ROW" clear=true advanced=true
+  stage 1 target 156,20 "Deliver to MIZU 21" clear=true advanced=true
+  delivery: money 296 -> 584
+race targets 6
+  stage 0 target 150,350 "Checkpoint 1/5" clear=true advanced=true
+  stage 1 target 450,350 "Checkpoint 2/5" clear=true advanced=true
+  stage 2 target 450,50 "Checkpoint 3/5" clear=true advanced=true
+  stage 3 target 150,50 "Checkpoint 4/5" clear=true advanced=true
+  stage 4 target 150,-250 "Checkpoint 5/5" clear=true advanced=true
+  stage 5 target -150,-250 "FINISH" clear=true advanced=true
+  race: money 584 -> 1589
+ERRORS(0) 
+RESULT PASS
