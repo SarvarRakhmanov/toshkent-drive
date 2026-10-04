@@ -12,7 +12,11 @@ export function OfflineCache() {
     const local = location.hostname === "localhost" || location.hostname === "127.0.0.1";
     if (local && !/[?&]sw=1/.test(location.search)) return; // dev/test servers: opt in with ?sw=1
     const t = setTimeout(() => {
-      navigator.serviceWorker.register(asset("/sw.js"), { scope: asset("/") || "/" }).catch(() => {});
+      navigator.serviceWorker.register(asset("/sw.js"), { scope: asset("/") || "/" }).then(async () => {
+        const reg = await navigator.serviceWorker.ready;
+        const urls = performance.getEntriesByType("resource").map((r) => r.name);
+        reg.active?.postMessage({ type: "td-cache", urls });
+      }).catch(() => {});
     }, 4000); // after the first frames — don't compete with the initial load
     return () => clearTimeout(t);
   }, []);

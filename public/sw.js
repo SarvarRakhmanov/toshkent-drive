@@ -53,3 +53,22 @@ self.addEventListener("fetch", (e) => {
     }));
   }
 });
+
+// the page that registered us already loaded its scripts/models before the
+// worker existed — it posts those URLs so they are on disk for the next visit
+self.addEventListener("message", (e) => {
+  const d = e.data;
+  if (!d || d.type !== "td-cache" || !Array.isArray(d.urls)) return;
+  e.waitUntil(Promise.all(d.urls.map(async (u) => {
+    try {
+      const url = new URL(u, self.location.origin);
+      if (url.origin !== self.location.origin || !url.pathname.startsWith(SCOPE)) return;
+      const isStatic = url.pathname.slice(SCOPE.length - 1).startsWith("/_next/static/");
+      if (!isStatic && !ASSET_RE.test(url.pathname)) return;
+      const c = await caches.open(isStatic ? STATIC : ASSETS);
+      if (await c.match(url.href, { ignoreSearch: !isStatic })) return;
+      const res = await fetch(url.href);
+      if (res.ok && res.status === 200) await c.put(url.href, res);
+    } catch { /* offline / quota */ }
+  })));
+});

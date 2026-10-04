@@ -128,7 +128,7 @@ export function ServicePanel() {
   return (
     <>
       {inCar && spec && (
-        <div id="td-fuel" style={{ position: "fixed", left: "50%", bottom: "calc(var(--sb, 6px) + 6px)", transform: "translateX(-50%)", zIndex: 20, pointerEvents: "none", display: "flex", alignItems: "center", gap: 6, padding: "3px 8px", borderRadius: 8, background: "rgba(0,0,0,0.45)", color: pct < 0.15 ? "#ff6a5f" : "#eef1f6", font: "800 11px/1 system-ui, sans-serif" }}>
+        <div id="td-fuel" style={{ position: "fixed", left: "calc(50% + 56px)", bottom: "calc(var(--sb, 6px) + 30px)", zIndex: 20, pointerEvents: "none", display: "flex", alignItems: "center", gap: 6, padding: "3px 8px", borderRadius: 8, background: "rgba(0,0,0,0.45)", color: pct < 0.15 ? "#ff6a5f" : "#eef1f6", font: "800 11px/1 system-ui, sans-serif" }}>
           ⛽
           <div style={{ width: 70, height: 7, borderRadius: 4, background: "rgba(255,255,255,0.2)", overflow: "hidden" }}>
             <div style={{ width: `${Math.round(pct * 100)}%`, height: "100%", background: pct < 0.15 ? "#ff4a3d" : pct < 0.35 ? "#ffc93d" : "#5fdc6a" }} />
