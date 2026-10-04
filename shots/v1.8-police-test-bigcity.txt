@@ -1,0 +1,7 @@
+after red light {"level":1,"reason":"RAN A RED LIGHT","evade":1.8808999999761589,"bust":0,"fines":0,"units":[{"x":150,"z":-99.4,"v":25}]} {"x":144.99891686700462,"z":62.447899758815765,"h":0,"y":0.998396173294168,"speed":15.8960417606707,"vLat":0}
+PASS running a red light gives a wanted star
+t 0 {"level":1,"reason":"RAN A RED LIGHT","evade":0,"bust":1.9806000000238424,"fines":0,"units":[{"x":145.4,"z":101,"v":0.2}]} {"x":144.9996039177134,"z":106.56821367517114,"h":0,"y":0.9986604733057902,"speed":0.2926722567733133,"vLat":0}
+PASS BUSTED clears the stars and fines (2000 -> 1850)
+PASS ESCAPED clears the stars with a camera fine (1850 -> 1750)
+ERRORS(0) 
+RESULT PASS

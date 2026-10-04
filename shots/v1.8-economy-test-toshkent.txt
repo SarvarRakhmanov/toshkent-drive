@@ -1,0 +1,33 @@
+PASS UZNEFTEPRODUKT CHILONZOR kerb spot clear (-56,200) -> true
+PASS UZNEFTEPRODUKT MINOR kerb spot clear (344,-200) -> true
+PASS UZNEFTEPRODUKT SERGELI kerb spot clear (-444,-100) -> true
+PASS UZNEFTEPRODUKT YUNUSOBOD kerb spot clear (156,300) -> true
+PASS UZNEFTEPRODUKT OLMAZOR kerb spot clear (-256,300) -> true
+PASS UZNEFTEPRODUKT BEKTEMIR kerb spot clear (356,0) -> true
+PASS CHILONZOR KVARTIRA kerb spot clear -> true
+PASS YUNUSOBOD HOVLI kerb spot clear -> true
+PASS TASHKENT CITY PENTHOUSE kerb spot clear -> true
+PASS fuel burns while driving and runs dry
+dry speeds 3.8648223337647503 3.8337159201745004
+PASS dry tank: no drive power (speed 3.86 -> 3.83 m/s)
+PASS OUT OF FUEL panel offers the fuel van
+PASS fuel van adds 10 L
+PASS gas station panel appears when stopped at the pump
+PASS refuel fills the tank (50.0/50 L, $29810 -> $29778)
+damage before repair 0.4
+PASS repair resets damage 0.4 -> 0 ($29778 -> $29518)
+econ {"owned":["seltos","lacetti","m3","k5","m3c"],"houses":[],"home":null,"loaded":true}
+PASS AVTO BOZOR panel lists cars for sale
+PASS bought the Captiva
+PASS home for sale panel
+PASS home bought and set
+PASS GO HOME brings the car to the home
+PASS night job refused by day ("NIGHT JOBS START AT 20:00")
+night 0.1038983316319495 null {"kind":"night","stage":0,"n":2,"target":{"x":-78,"z":356,"label":"Pick up Bekzod","radius":9,"stop":true},"timeLeft":43.44444443267265,"pay":297}
+PASS night taxi starts at 0.1h (pay $297)
+ambience {"rumble":0.04502706541151597,"rain":0,"crickets":0.016481956392322687,"birds":11,"horns":5,"on":true}
+PASS ambience running
+caches ["td-v1.8-pages","td-v1.8-assets"]
+PASS service worker active with td-v1.8 caches
+ERRORS(0) 
+RESULT PASS
