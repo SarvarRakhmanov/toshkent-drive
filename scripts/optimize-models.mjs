@@ -47,6 +47,22 @@ const JOBS = [
   ["cobalt.glb", "traffic/cobalt.glb", 6000, 256, /^bancos|^painel|^steering_ok|^Gravel/i, { strip: true, steps: 12, errScale: 2 }],
   ["captiva.glb", "traffic/captiva.glb", 6000, 256, /^interior|^plaquette|^visse/i, { strip: true, steps: 12, errScale: 2 }],
   ["lada2103.glb", "traffic/lada2103.glb", 6000, 256, /^Torpedoplastic2103|^2103Divan|^steer_02a|^Radiola2103|^Lada2103_gauges|^Suspension|^coilfeal|^amdb11|^VAZPotolok/i, { strip: true, steps: 12, errScale: 2 }],
+  // v1.7b real Tashkent landmarks (Sketchfab; licences in CREDITS.md)
+  ["landmarks/temur.glb", "landmarks/temur.glb", 14000, 1024],
+  ["landmarks/oliy-majlis.glb", "landmarks/oliy-majlis.glb", 18000, 512, null, { strip: true, steps: 10 }],
+  ["landmarks/tv-tower.glb", "landmarks/tv-tower.glb", 9000, 512],
+  ["landmarks/tv-tower.glb", "landmarks/tv-tower-far.glb", 1500, 128, null, { untextured: true, strip: true, steps: 12, errScale: 3 }],
+  ["landmarks/circus.glb", "landmarks/circus.glb", 4600, 512, null, { strip: true }],
+  // phone LOW variants
+  ["landmarks/temur.glb", "landmarks/temur-low.glb", 5000, 512],
+  ["landmarks/oliy-majlis.glb", "landmarks/oliy-majlis-low.glb", 7000, 256, null, { strip: true, steps: 12, errScale: 1.5 }],
+  ["landmarks/tv-tower.glb", "landmarks/tv-tower-low.glb", 5000, 128, null, { untextured: true, strip: true, steps: 12, errScale: 1.5 }],
+  ["landmarks/nest-one.glb", "landmarks/nest-one-low.glb", 4000, 256, null, { strip: true, steps: 12, errScale: 1.5 }],
+  // the NBU source also carries Google Earth snapshot ground textures — dropped
+  ["landmarks/nbu.glb", "landmarks/nbu.glb", 7000, 256, /Google_Earth|^L18X/i],
+  ["landmarks/nbu.glb", "landmarks/nbu-low.glb", 5000, 64, /Google_Earth|^L18X/i, { untextured: true, strip: true }],
+  ["landmarks/nest-one.glb", "landmarks/nest-one.glb", 9000, 512, null, { strip: true, steps: 10 }],
+  ["landmarks/nest-one.glb", "landmarks/nest-one-far.glb", 1200, 128, null, { strip: true, steps: 12, errScale: 3 }],
   ["sedan-a.glb", "traffic/sedan-a.glb", 6000, 256],
   ["sedan-b.glb", "traffic/sedan-b.glb", 6000, 256],
   ["hatch-a.glb", "traffic/hatch-a.glb", 6000, 256],
@@ -118,6 +134,30 @@ for (const [file, out, budget, px, drop, opts = {}] of JOBS) {
   dropUnusedUVs(doc);
   // opts.strip: drop normals (and UVs on untextured materials) so the
   // simplifier can collapse across hard-edge seams; normals are rebuilt after
+  // opts.untextured: bake each texture's mean colour into the base colour and
+  // drop textures + UVs (far LODs / phone variants: palette() then merges
+  // everything into one or two materials = one or two draw calls)
+  if (opts.untextured) {
+    const sharpMod = (await import("sharp")).default;
+    for (const mat of doc.getRoot().listMaterials()) {
+      const t = mat.getBaseColorTexture();
+      if (t && t.getImage()) {
+        try {
+          const st = await sharpMod(Buffer.from(t.getImage())).stats();
+          const ch = st.channels;
+          const f = mat.getBaseColorFactor();
+          const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+          mat.setBaseColorFactor([f[0] * lin(ch[0].mean), f[1] * lin(ch[1].mean), f[2] * lin(ch[2].mean), f[3]]);
+        } catch { /* keep factor */ }
+      }
+      mat.setBaseColorTexture(null); mat.setNormalTexture(null); mat.setMetallicRoughnessTexture(null);
+      mat.setOcclusionTexture(null); mat.setEmissiveTexture(null);
+    }
+    for (const mesh of doc.getRoot().listMeshes()) for (const prim of mesh.listPrimitives()) {
+      for (const sem of prim.listSemantics()) if (sem.startsWith("TEXCOORD")) prim.setAttribute(sem, null);
+    }
+    await doc.transform(prune());
+  }
   if (opts.strip) {
     for (const mesh of doc.getRoot().listMeshes()) for (const prim of mesh.listPrimitives()) {
       const m = prim.getMaterial();

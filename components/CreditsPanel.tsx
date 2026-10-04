@@ -33,6 +33,11 @@ export function CreditsPanel() {
         <b>Lada VAZ-2103 Zhiguli</b> by Black Snow (Sketchfab, CC BY 4.0, modified: decimated/compressed). Kia Seltos model supplied by the owner.
       </p>
       <p>
+        Tashkent landmarks (Sketchfab, modified): <b>Tashkent Timur Statue</b> by Global Digital Heritage (CC BY-NC 4.0),{" "}
+        <b>Oliy Majlis Binosi</b> by Nurali, <b>Tashkent TV Tower</b> by Q.SARDOR, <b>Tashkent Sirk</b> and{" "}
+        <b>NBU Uzbekistan Tashkent</b> by UZBEK 3D, <b>Nest One</b> by qudratovalisher83 (CC BY 4.0).
+      </p>
+      <p>
         Cockpit interiors: <b>Autonomous GT Car Interior Design</b> by benlockett and{" "}
         <b>Car interior</b> by Gerhald (Sketchfab, CC BY 4.0, modified).
       </p>

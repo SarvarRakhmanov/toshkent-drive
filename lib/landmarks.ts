@@ -29,6 +29,11 @@ export const LANDMARKS: Landmark[] = [
   { name: "TASHKENT CITY", x: -100, z: 0, col: "#ffd76a" },
   { name: "CHILONZOR", x: 0, z: 100, col: "#1e8f7b" },
   { name: "MIZU 21", x: 100, z: 0, col: "#f4c430" },
+  // v1.7b real landmark models (components/TashkentLandmarks.tsx), each on a
+  // block of its own (chunk centres, off the road grid)
+  { name: "TOSHKENT SIRKI", x: 300, z: 100, col: "#ff8a3d" },
+  { name: "MILLIY BANK (NBU)", x: 100, z: 200, col: "#3da5ff" },
+  { name: "NEST ONE", x: -200, z: 0, col: "#c9e8ff" },
   // chunk (-8,1) — round(-750/100)=-8, round(100/100)=1 — free: every other
   // landmark rounds to (0,-1)/(0,0)/(2,2)/(-2,2)/(2,-2)/(-2,-2)/(1,-3)/(6,1)/
   // (5,1)/(1,0), none of them (-8,1). See components/Airport.tsx for the

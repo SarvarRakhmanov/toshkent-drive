@@ -114,3 +114,18 @@ Pitch follows the simulated engine RPM (firing frequency rpm/60 × cylinders/2).
 | models/interiors/sport-interior.glb | 2021 BMW M4 Competition | Ricy ([ngon_3d](https://sketchfab.com/ngon_3d)) | [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) (license verified on the Sketchfab API 2026-10-04), **modified** (cabin only — body, glass, doors, wheels dropped; decimated 117k → 28.8k tris, textures 256 px WebP, M steering wheel re-pivoted) | https://sketchfab.com/3d-models/2021-bmw-m4-competition-d3f07b471d9f4a2c9a2acf79d88a3645 | sports cockpit (v2.1): BMW M3 Competition, BMW M3 E30 |
 
 The driver's gloved hands and sleeves are procedural (components/CarInterior.tsx).
+
+
+## Real Tashkent landmarks (v1.7b)
+All licences verified on the Sketchfab API on 2026-10-04; all **modified** (decimated with meshoptimizer, textures resized to WebP, palette-merged materials, meshopt compression, plus small phone-LOW / far LOD variants). Files under `public/models/landmarks/`.
+
+| File(s) | Model | Author | License | Source |
+|---|---|---|---|---|
+| temur.glb, temur-low.glb | Tashkent Timur Statue, Uzbekistan | [Global Digital Heritage](https://sketchfab.com/GlobalDigitalHeritage) | [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) (1.48M → 13.3k / 10.9k tris) | https://sketchfab.com/3d-models/tashkent-timur-statue-uzbekistan-bec57b6b281645d6bb597823a5434878 |
+| oliy-majlis.glb, oliy-majlis-low.glb | Oliy Majlis Binosi | [Nurali (nurali_cg)](https://sketchfab.com/nurali_cg) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (143k → 18.1k / 6.6k tris) | https://sketchfab.com/3d-models/oliy-majlis-binosi-8b363859698c4ff99629506d3cff7289 |
+| tv-tower.glb, tv-tower-low.glb, tv-tower-far.glb | Tashkent TV Tower | [Q.SARDOR (qsardor57913)](https://sketchfab.com/qsardor57913) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (21k; 4.8k / 1.5k LODs) | https://sketchfab.com/3d-models/tashkent-tv-tower-9cd52aa5c2914733ac748a80873e037f |
+| circus.glb | Tashkent Sirk | [UZBEK 3D (Uzbek3D)](https://sketchfab.com/Uzbek3D) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (4.6k tris) | https://sketchfab.com/3d-models/tashkent-sirk-228d1e21e0b64523bc67b67f1070a968 |
+| nbu.glb, nbu-low.glb | NBU UZBEKISTAN TASHKENT | [UZBEK 3D (Uzbek3D)](https://sketchfab.com/Uzbek3D) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (7k → 6.5k / 5k tris; the source's Google Earth snapshot ground textures were removed) | https://sketchfab.com/3d-models/nbu-uzbekistan-tashkent-4576a8242e564797ad84398ae84b099d |
+| nest-one.glb, nest-one-low.glb, nest-one-far.glb | 3D model uzbekistan tashkent sity Nest One | [qudratovalisher83](https://sketchfab.com/qudratovalisher83) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (89k → 9k / 3.8k / 2.3k tris) | https://sketchfab.com/3d-models/3d-model-uzbekistan-tashkent-sity-nest-one-7692a34317c74efdb1c28f921db12f54 |
+
+Not used: Hotel Uzbekistan (Sketchfab 4dcb8e0b…) — no licence and not downloadable; the skyline impostor stays.
