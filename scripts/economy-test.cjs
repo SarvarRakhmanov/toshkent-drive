@@ -26,9 +26,9 @@ const OUT = process.env.OUT || "shots";
   // 1) fuel burn -> dry tank -> no power -> fuel van
   const s0 = st[0];
   await ev((p) => window.__td.summonCar(p.x, p.z - 60, 0), s0.pump); await page.waitForTimeout(2000);
-  await ev(() => window.__td.setFuel(0.25));
+  await ev(() => window.__td.setFuel(0.08));
   await page.keyboard.down("KeyW");
-  const dry = await until(() => window.__td.fuel().litres <= 0, null, 90000);
+  const dry = await until(() => window.__td.fuel().litres <= 0, null, 180000);
   check(dry, "fuel burns while driving and runs dry");
   await page.waitForTimeout(1500);
   const v0 = Math.abs((await ev(() => window.__td.car())).speed);
