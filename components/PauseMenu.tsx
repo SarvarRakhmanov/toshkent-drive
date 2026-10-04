@@ -1,5 +1,6 @@
 "use client";
 
+import { useEconomy, CAR_PRICE } from "@/lib/economy";
 import { useEffect } from "react";
 import { usePauseStore } from "@/lib/pauseStore";
 import { useHudStore, CAM_MODES } from "@/lib/hudStore";
@@ -10,7 +11,7 @@ import { isMuted } from "@/lib/audio";
 import { getAudioCtx } from "@/lib/audio";
 import {
   actionSelectCar, actionSelectVehicle, actionCamera, actionMap, actionPhone,
-  actionWeather, actionMute, actionGraphics, actionResetCar,
+  actionWeather, actionMute, actionGraphics, actionResetCar, actionGoHome,
 } from "@/lib/actions";
 import { PlateEditor } from "@/components/PlateEditor";
 import { MapPicker } from "@/components/MapPicker";
@@ -31,6 +32,9 @@ export function PauseMenu() {
   const active = useHudStore((s) => s.active);
   const camMode = useHudStore((s) => s.camMode);
   const carIdx = usePlayerCarStore((s) => s.index);
+  const owned = useEconomy((s) => s.owned);
+  const econLoaded = useEconomy((s) => s.loaded);
+  const home = useEconomy((s) => s.home);
   const quality = useGfxStore((s) => s.quality);
 
   // silence the engine while paused
@@ -79,7 +83,7 @@ export function PauseMenu() {
             <div id="td-vehicles">
               {PLAYER_CARS.map((c, i) => (
                 <button key={c.id} type="button" data-car={c.id} style={active === "car" && carIdx === i ? sel : btn} onClick={run(() => actionSelectCar(i))}>
-                  {c.name}
+                  {c.name}{!econLoaded || owned.includes(c.id) ? "" : `  🔒 $${CAR_PRICE[c.id] ?? 0} · AVTO BOZOR`}
                 </button>
               ))}
               <button type="button" data-car="bike" style={active === "bike" ? sel : btn} onClick={run(() => actionSelectVehicle("bike"))}>MOTORBIKE</button>
@@ -93,6 +97,7 @@ export function PauseMenu() {
             <button type="button" style={btn} onClick={run(actionWeather, true)}>CHANGE WEATHER</button>
             <button type="button" style={btn} onClick={run(actionMute, true)}>SOUND ON / OFF</button>
             <button type="button" style={btn} onClick={run(actionResetCar)}>RESET CAR</button>
+            <button type="button" id="td-gohome" style={btn} onClick={run(actionGoHome)}>{home ? "GO HOME" : "GO HOME (buy a home first)"}</button>
             <button type="button" style={btn} onClick={run(actionMap)}>CITY MAP</button>
             <button type="button" style={btn} onClick={run(actionPhone)}>PHONE / GARAGE</button>
             <button type="button" style={btn} onClick={run(() => useCreditsStore.getState().setOpen(true))}>CREDITS</button>

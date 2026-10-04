@@ -1,5 +1,6 @@
 "use client";
 
+import { fuelOf, fuelTank, burnRate, persistEcon, carRepair } from "@/lib/economy";
 import { useRef, useEffect, useMemo, useState, Suspense } from "react";
 import { PlayerGlbCar, playerWheels } from "@/components/GlbCar";
 import { useThree } from "@react-three/fiber";
@@ -231,6 +232,11 @@ export function Car() {
       specCache.current = { index: carIdx, rev: career.rev, spec: effectiveSpec(def?.phys, def ? career.upgradesFor(def.id) : STOCK) };
     }
     const hb = isActive && k.handbrake;
+    // v1.8 fuel (lib/economy.ts): a dry tank gives no throttle; stolen cars don't count
+    const fuelId = PLAYER_CARS[carIdx]?.id ?? "";
+    const metered = isActive && !useHudStore.getState().stolenCar && !!fuelId;
+    const hasFuel = !metered || fuelOf(fuelId) > 0;
+    if (isActive && carRepair.pending) { carRepair.pending = false; dyn.current.damage = 0; }
     rampSteer(car.current, steer, hb, d);
     const bt = body.translation();
     const { dx, dz } = stepDynamics(
@@ -238,7 +244,8 @@ export function Car() {
       dyn.current,
       specCache.current.spec,
       {
-        throttle: isActive && k.forward ? 1 : 0,
+        throttle: isActive && k.forward && hasFuel ? 1 : 0,
+        noPower: !hasFuel,
         brake: isActive && k.back ? 1 : 0,
         steer: car.current.steerAng,
         handbrake: hb,
@@ -251,6 +258,12 @@ export function Car() {
       groundYAt
     );
     if (isActive) engineTelemetry.active = true;
+    if (metered && hasFuel) {
+      const left = Math.max(0, fuelOf(fuelId) - burnRate(fuelId, dyn.current.throttle, car.current.speed) * d);
+      fuelTank[fuelId] = left;
+      if (left === 0) useHudStore.getState().showMsg("OUT OF FUEL — CALL THE FUEL VAN");
+      persistEcon();
+    }
     if (isActive) useHudStore.getState().setEngine(dyn.current.gear, dyn.current.rpm / specCache.current.spec.redline);
     if (visBody.current) {
       visBody.current.rotation.set(dyn.current.pitch, 0, dyn.current.roll);
@@ -378,7 +391,7 @@ export function Car() {
     // v1.6.1 auto-unstuck: GAS (or reverse) held for STUCK_SECONDS of game
     // time while the car is crawling (<0.6 m/s, e.g. the sweep keeps eating
     // the move) and has gone < 0.75 m — then hop/reposition to a clear spot
-    if (isActive && (k.forward || k.back) && !k.handbrake && Math.abs(car.current.speed) < 0.6) {
+    if (isActive && hasFuel && (k.forward || k.back) && !k.handbrake && Math.abs(car.current.speed) < 0.6) {
       const sk = stuck.current;
       if (sk.t0 === 0 || Math.hypot(nextPos.x - sk.x, nextPos.z - sk.z) > 0.75) { sk.t0 = 1e-6; sk.x = nextPos.x; sk.z = nextPos.z; }
       else if ((sk.t0 += d) > STUCK_SECONDS) {

@@ -5,6 +5,7 @@ import { LANDMARKS, type Landmark } from "@/lib/landmarks";
 import { useCareer } from "@/lib/career";
 import { roadRoute } from "@/lib/route";
 import { playSfx } from "@/lib/missionSfx";
+import { skyState } from "@/lib/skyState";
 
 // v1.9 missions: TAXI (pick up a fare, drop them off), DELIVERY (collect a
 // parcel at one landmark, deliver to another), STREET RACE (checkpoint run
@@ -12,7 +13,10 @@ import { playSfx } from "@/lib/missionSfx";
 // the GPS (hud navTarget → minimap / big-map route via lib/route.ts) and a
 // light-beam marker (components/Missions.tsx). Payouts go to lib/career.ts.
 
-export type MissionKind = "taxi" | "delivery" | "race";
+export type MissionKind = "taxi" | "delivery" | "race" | "night";
+/** v1.8 night jobs: 20:00-05:00 only, 1.8x pay (lib/skyState.ts hour) */
+export const NIGHT_PAY = 1.8;
+export const isNightHour = () => skyState.hour >= 20 || skyState.hour < 5;
 
 export interface Mission {
   kind: MissionKind;
@@ -82,7 +86,7 @@ function setNav(name: string, x: number, z: number, col: string) {
   useHudStore.getState().setNavTarget({ name, x, z, col });
 }
 
-const KIND_COL: Record<MissionKind, string> = { taxi: "#ffd21f", delivery: "#38e07b", race: "#ff4fd8" };
+const KIND_COL: Record<MissionKind, string> = { taxi: "#ffd21f", delivery: "#38e07b", race: "#ff4fd8", night: "#9b7bff" };
 export const missionColor = (k: MissionKind) => KIND_COL[k];
 
 export const useMissions = create<MissionState>((set, get) => ({
@@ -95,19 +99,20 @@ export const useMissions = create<MissionState>((set, get) => ({
     const px = worldState.px, pz = worldState.pz;
     if (px < X_MIN - 80 || px > X_MAX + 60 || Math.abs(pz) > 420) return "DRIVE BACK INTO THE CITY";
     let m: Mission;
-    if (kind === "taxi") {
+    if (kind === "night" && !isNightHour()) return "NIGHT JOBS START AT 20:00";
+    if (kind === "taxi" || kind === "night") {
       const a = randomAround(px, pz, 110, 240);
       const b = randomAround(a.x, a.z, 280, 560);
       const who = NAMES[(Math.random() * NAMES.length) | 0];
       const len = routeLen(a.x, a.z, b.x, b.z);
       m = {
-        kind, title: `TAXI — ${who}`, stage: 0, elapsed: 0,
+        kind, title: kind === "night" ? `NIGHT TAXI — ${who}` : `TAXI — ${who}`, stage: 0, elapsed: 0,
         targets: [
           { ...a, label: `Pick up ${who}`, radius: 9, stop: true },
           { ...b, label: `Drop ${who} off`, radius: 9, stop: true },
         ],
         timeLeft: routeLen(px, pz, a.x, a.z) / 9 + 25,
-        pay: Math.round(40 + len * 0.22),
+        pay: Math.round((40 + len * 0.22) * (kind === "night" ? NIGHT_PAY : 1)),
       };
     } else if (kind === "delivery") {
       const lm = LANDMARKS.filter((l) => l.x > X_MIN && l.x < X_MAX && Math.abs(l.z) < 340);

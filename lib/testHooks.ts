@@ -22,6 +22,9 @@ import { carSummon } from "@/lib/vehicleSummon";
 import { carSafety, carWorldRef } from "@/components/Car";
 import { isClear } from "@/lib/safeSpot";
 import { skyState } from "@/lib/skyState";
+import { fuelOf, fuelSpec, fuelTank, useEconomy, STATIONS, HOUSES, pumpSpot, houseSpot } from "@/lib/economy";
+import { PLAYER_CARS, usePlayerCarStore } from "@/lib/playerCar";
+import { engineTelemetry } from "@/lib/vehicleDynamics";
 
 if (typeof window !== "undefined") {
   (window as unknown as { __td: unknown }).__td = {
@@ -48,6 +51,12 @@ if (typeof window !== "undefined") {
     wanted: () => { const w = useWanted.getState(); return { level: w.level, reason: w.reason, evade: w.evade, bust: w.bust, fines: w.fines, units: chaseUnits.filter((u) => u.on).map((u) => ({ x: +u.x.toFixed(1), z: +u.z.toFixed(1), v: +u.v.toFixed(1) })) }; },
     crime: (c: "red" | "crash" | "ped") => useWanted.getState().report(c),
     career: () => { const c = useCareer.getState(); return { money: c.money, jobs: c.jobs, levels: c.levels, rev: c.rev }; },
+    // v1.8 economy
+    fuel: () => { const id = PLAYER_CARS[usePlayerCarStore.getState().index]?.id ?? ""; return { id, litres: fuelOf(id), tank: fuelSpec(id).tank, damage: engineTelemetry.damage }; },
+    setFuel: (l: number) => { const id = PLAYER_CARS[usePlayerCarStore.getState().index]?.id ?? ""; fuelTank[id] = l; },
+    econ: () => { const e = useEconomy.getState(); return { owned: e.owned, houses: e.houses, home: e.home, loaded: e.loaded }; },
+    stations: () => STATIONS.map((s) => ({ ...s, pump: pumpSpot(s) })),
+    houses: () => HOUSES.map((h) => ({ ...h, spot: houseSpot(h) })),
     giveMoney: (n: number) => useCareer.getState().addMoney(n),
     buyUpgrade: (car: string, k: "power" | "grip" | "brakes" | "weight") => useCareer.getState().buy(car, k),
     enter: (k: string) => { useHudStore.getState().setActive(k as never); useHudStore.getState().setCamMode(0); },

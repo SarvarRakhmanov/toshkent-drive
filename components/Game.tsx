@@ -86,6 +86,7 @@ import { Props } from "@/components/Props";
 import { TashkentLandmarks } from "@/components/TashkentLandmarks";
 import { Skyline } from "@/components/Skyline";
 import { PoliceChase } from "@/components/PoliceChase";
+import { ServicePlaces } from "@/components/ServicePlaces";
 import { isBigCity } from "@/lib/mapChoice";
 import { Clouds } from "@/components/Clouds";
 import { Headlights } from "@/components/Headlights";
@@ -384,6 +385,7 @@ export default function Game() {
               <group name="Traffic"><Traffic /></group>
               <TrafficSignals />
               <PoliceChase />
+              <ServicePlaces />
               <Missions />
               <group name="Pedestrians"><Suspense fallback={<BootHold />}><Pedestrians /></Suspense></group>
               <Player />

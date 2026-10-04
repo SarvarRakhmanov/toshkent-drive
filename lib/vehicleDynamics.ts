@@ -103,6 +103,8 @@ export const engineTelemetry = { rpm: 850, redline: 6800, gear: 1, throttle: 0, 
 
 export interface DynInput {
   throttle: number; // 0..1 (forward key)
+  /** v1.8: dry tank — no drive torque either way */
+  noPower?: boolean;
   brake: number; // 0..1 (back key)
   steer: number; // -1..1, + = left (already ramped: CarState.steerAng)
   handbrake: boolean;
@@ -185,7 +187,7 @@ function substep(car: CarState, dyn: DynState, s: VehicleSpec, inp: DynInput, dt
   const ratio = dyn.gear === -1 ? s.reverseRatio : s.gears[Math.max(0, dyn.gear - 1)];
   const wheelRpm = (Math.abs(vx) / s.wheelRadius) * (60 / (2 * Math.PI));
   let rpm = wheelRpm * ratio * s.finalDrive;
-  const throttle = dyn.gear === -1 ? inp.brake : inp.throttle;
+  const throttle = inp.noPower ? 0 : dyn.gear === -1 ? inp.brake : inp.throttle;
   // slipping clutch at launch: the engine never drops below a throttle-dependent floor
   rpm = Math.max(rpm, s.idleRpm + throttle * (dyn.gear <= 1 ? 2600 : 600) * (Math.abs(vx) < 8 ? 1 : 0));
   // automatic shifting
@@ -203,7 +205,7 @@ function substep(car: CarState, dyn: DynState, s: VehicleSpec, inp: DynInput, dt
   let Fdrive = dyn.shiftT > 0 ? 0 : (torqueAt(s, dyn.rpm) * ratio * s.finalDrive * 0.88 * throttle * power) / s.wheelRadius;
   if (dyn.gear === -1) { Fdrive = -Fdrive; if (vx < -9) Fdrive = 0; }
   if (s.limiterKmh && vx * 3.6 > s.limiterKmh && !inp.nitro) Fdrive = Math.min(Fdrive, 0);
-  if (inp.nitro && dyn.gear > 0) Fdrive += m * 11; // NOS: extra thrust, raises the drag-limited top speed too
+  if (inp.nitro && !inp.noPower && dyn.gear > 0) Fdrive += m * 11; // NOS: extra thrust, raises the drag-limited top speed too
 
   // ---- brakes (back key while rolling forward), handbrake on the rear
   let FbF = 0, FbR = 0;

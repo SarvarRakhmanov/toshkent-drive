@@ -3,6 +3,8 @@
 // Game actions shared by the keyboard shortcuts (components/Game.tsx) and the
 // on-screen touch buttons (components/TouchControls.tsx), so both always do
 // exactly the same thing.
+import { useEconomy, CAR_PRICE, HOUSES, houseSpot } from "@/lib/economy";
+import { requestPlayerTeleport } from "@/lib/playerTeleport";
 import { useHudStore, LIGHT_MODES, CAM_MODES } from "@/lib/hudStore";
 import { useGfxStore } from "@/lib/gfx";
 import { usePlayerCarStore, PLAYER_CARS } from "@/lib/playerCar";
@@ -74,7 +76,21 @@ export function actionGraphics() {
  *  to it) and becomes the active vehicle. i undefined = next car. */
 export function actionSelectCar(i?: number) {
   const pc = usePlayerCarStore.getState();
-  if (i === undefined) pc.next(); else pc.select(i);
+  const econ = useEconomy.getState();
+  if (i === undefined) {
+    // next OWNED car (v1.8: the dealer cars must be bought first)
+    const n = PLAYER_CARS.length;
+    let j = pc.index;
+    for (let s = 0; s < n; s++) { j = (j + 1) % n; if (!econ.loaded || econ.isOwned(PLAYER_CARS[j].id)) break; }
+    pc.select(j);
+  } else {
+    const c = PLAYER_CARS[i];
+    if (c && econ.loaded && !econ.isOwned(c.id)) {
+      hud().showMsg(`${c.name}: BUY IT AT AVTO BOZOR — $${CAR_PRICE[c.id] ?? 0}`);
+      return;
+    }
+    pc.select(i);
+  }
   const h = hud();
   if (h.stolenCar) h.setStolenCar(null);
   if (h.active !== "car") {
@@ -84,6 +100,20 @@ export function actionSelectCar(i?: number) {
     h.setActive("car");
   }
   h.showMsg("CAR: " + PLAYER_CARS[usePlayerCarStore.getState().index].name);
+}
+
+/** v1.8: back to the home you bought (lib/economy.ts) — car and all */
+export function actionGoHome() {
+  const e = useEconomy.getState();
+  const h = HOUSES.find((q) => q.id === e.home);
+  const H = hud();
+  if (!h) { H.showMsg("BUY A HOME FIRST (FOR SALE SIGNS ON THE MAP)"); return; }
+  const p = houseSpot(h);
+  if (H.active === "car") requestCarSummon(p.x, p.z + 6, Math.PI);
+  else if (H.active === "foot") requestPlayerTeleport(h.x + h.side * 2, h.z, -h.side * Math.PI / 2);
+  else { requestCarSummon(p.x, p.z + 6, Math.PI); H.setActive("car"); }
+  H.showMsg("HOME: " + h.name);
+  setTimeout(saveGame, 1500);
 }
 
 export function actionNextCar() {

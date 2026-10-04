@@ -6,7 +6,8 @@ import { worldState } from "@/lib/worldState";
 import { requestCarSummon } from "@/lib/vehicleSummon";
 import { cycleWeather } from "@/lib/weatherState";
 import { LANDMARKS } from "@/lib/landmarks";
-import { useMissions, type MissionKind } from "@/lib/missions";
+import { useMissions, type MissionKind, isNightHour, NIGHT_PAY } from "@/lib/missions";
+import { STATIONS, HOUSES, DEALER, pumpSpot, houseSpot, useEconomy } from "@/lib/economy";
 import { useCareer, UPGRADE_KEYS, UPGRADE_LABEL, UPGRADE_COST, MAX_LEVEL } from "@/lib/career";
 import { PLAYER_CARS, usePlayerCarStore } from "@/lib/playerCar";
 import { saveGame } from "@/lib/saveGame";
@@ -79,6 +80,12 @@ export function Phone() {
             <button type="button" id="job-race" onClick={() => startJob("race")} style={{ ...btnStyle, textAlign: "center", padding: "8px 4px", fontSize: 12 }}>🏁 Race</button>
           </div>
         )}
+        {!mission && (
+          <button type="button" id="job-night" onClick={() => startJob("night")} style={{ ...btnStyle, textAlign: "center", padding: "8px 4px", fontSize: 12, opacity: isNightHour() ? 1 : 0.5 }}>
+            🌙 Night taxi ×{NIGHT_PAY} pay
+            <span style={hintStyle}>{isNightHour() ? "the city's paying double tonight" : "20:00 – 05:00 only"}</span>
+          </button>
+        )}
 
         <div style={{ margin: "10px 0 4px", color: "#6a7280", fontSize: 11, letterSpacing: 1 }}>GARAGE · {car.name}</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
@@ -91,6 +98,24 @@ export function Phone() {
         </div>
 
         <div style={{ margin: "10px 0 4px", color: "#6a7280", fontSize: 11, letterSpacing: 1 }}>SET GPS WAYPOINT</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button type="button" id="gps-gas" onClick={() => {
+            const { px, pz } = worldState;
+            const s = [...STATIONS].sort((a, b) => Math.hypot(a.x - px, a.z - pz) - Math.hypot(b.x - px, b.z - pz))[0];
+            const p = pumpSpot(s);
+            setNavTarget({ name: "⛽ " + s.name, x: p.x, z: p.z, col: "#3d8bff" });
+            setPhoneOpen(false);
+          }} style={{ ...btnStyle, textAlign: "center", padding: "8px 4px", fontSize: 12 }}>⛽ Gas / repair</button>
+          <button type="button" id="gps-dealer" onClick={() => { setNavTarget({ name: "AVTO BOZOR", x: DEALER.x, z: DEALER.z, col: "#00e5ff" }); setPhoneOpen(false); }} style={{ ...btnStyle, textAlign: "center", padding: "8px 4px", fontSize: 12 }}>🚗 Car dealer</button>
+          <button type="button" id="gps-home" onClick={() => {
+            const { px, pz } = worldState;
+            const e = useEconomy.getState();
+            const list = e.home ? HOUSES.filter((h) => h.id === e.home) : [...HOUSES].sort((a, b) => Math.hypot(a.x - px, a.z - pz) - Math.hypot(b.x - px, b.z - pz));
+            const h = list[0]; const p = houseSpot(h);
+            setNavTarget({ name: (e.home ? "🏠 " : "FOR SALE: ") + h.name, x: p.x, z: p.z, col: "#9dff6a" });
+            setPhoneOpen(false);
+          }} style={{ ...btnStyle, textAlign: "center", padding: "8px 4px", fontSize: 12 }}>🏠 Home</button>
+        </div>
         <div data-scroll style={{ maxHeight: 120, overflowY: "auto", touchAction: "pan-y", display: "flex", flexDirection: "column", gap: 4 }}>
           {LANDMARKS.map((l) => (
             <button
