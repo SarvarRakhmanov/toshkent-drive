@@ -241,3 +241,23 @@ export function PhysicsProbe() {
   }, [world]);
   return null;
 }
+
+/** v1.7b perf: three.js draws every transparent DoubleSide material twice
+ *  (back faces, then front faces). Car glass, plates, foliage cards etc. made
+ *  that ~20 hidden extra draw calls on phone LOW. Single-pass them (glass is
+ *  thin, the sorting difference is invisible at game distances). Re-scans
+ *  every 3 s for newly mounted content. */
+export function SinglePassTransparent() {
+  const next = useRef(0);
+  useFrame((state) => {
+    if (state.clock.elapsedTime < next.current) return;
+    next.current = state.clock.elapsedTime + 3;
+    state.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const mats = Array.isArray(m.material) ? m.material : [m.material];
+      for (const mat of mats) if (mat && mat.transparent && mat.side === THREE.DoubleSide && !mat.forceSinglePass) mat.forceSinglePass = true;
+    });
+  }, 0, true);
+  return null;
+}

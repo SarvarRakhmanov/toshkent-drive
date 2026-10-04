@@ -64,6 +64,27 @@ export function PerfProbe() {
       });
       return Object.entries(out).sort((a, b) => b[1] - a[1]).slice(0, 40);
     };
+    // v1.7b: visible meshes with no named ancestor (stray top-level draws)
+    (window as unknown as { __tdOrphans: () => unknown }).__tdOrphans = () => {
+      const out: Record<string, number> = {};
+      const fr = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      scene.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        for (let p: THREE.Object3D | null = o; p; p = p.parent) if (!p.visible) return;
+        for (let p: THREE.Object3D | null = o; p && p !== scene; p = p.parent) if (p.name) return;
+        if (m.frustumCulled && m.geometry) {
+          if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+          if (!fr.intersectsSphere(m.geometry.boundingSphere!.clone().applyMatrix4(m.matrixWorld))) return;
+        }
+        const mat = Array.isArray(m.material) ? m.material[0] : m.material;
+        const wp = m.getWorldPosition(new THREE.Vector3());
+        let root: THREE.Object3D = o; while (root.parent && root.parent !== scene) root = root.parent;
+        const k = `${m.geometry?.type}|${mat?.type}|root@${Math.round(root.position.x)},${Math.round(root.position.z)} kids=${root.children.length}|at ${Math.round(wp.x / 10) * 10},${Math.round(wp.z / 10) * 10}`;
+        out[k] = (out[k] ?? 0) + 1;
+      });
+      return Object.entries(out).sort((a, b) => b[1] - a[1]).slice(0, 20);
+    };
     // per-object census under one named root: visible meshes grouped by the
     // root's direct child index → [mesh count, material names]
     (window as unknown as { __tdDrawIn: (name: string) => unknown }).__tdDrawIn = (name: string) => {

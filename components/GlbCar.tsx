@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@/lib/safeFrame";
+import { useGfxStore } from "@/lib/gfx";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { livePlateMaterial } from "@/lib/plates";
@@ -312,6 +313,7 @@ export const TRAFFIC_MODELS = [
 
 const _tp = new THREE.Vector3();
 const NEAR_RIG2 = 38 * 38;
+const rigNpcWheels = () => useGfxStore.getState().quality !== "low";
 
 /** NPC car. Far: one merged static body (1–3 draw calls). Within ~38 m of
  *  the camera (v1.7b) a second copy with rigged wheels is swapped in so the
@@ -336,7 +338,8 @@ export function TrafficGlbCar({ index, color, speed }: { index: number; color: s
     const g = group.current;
     if (!g || !g.parent?.visible) return;
     g.getWorldPosition(_tp);
-    const close = _tp.distanceToSquared(camera.position) < NEAR_RIG2;
+    // phone LOW keeps the 1–3-call static NPC body (draw-call budget)
+    const close = rigNpcWheels() && _tp.distanceToSquared(camera.position) < NEAR_RIG2;
     if (close && !near.current) {
       const o = prepare(gltf.scene, def.rotY ?? 0, def.length, undefined, tint, !def.noTint, false);
       o.position.y += RIDE_HEIGHT;

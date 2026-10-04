@@ -55,7 +55,7 @@ import { LightPool } from "@/components/LightPool";
 import { Deferred } from "@/components/Deferred";
 import { ReadyGate, BootHold } from "@/components/ReadyGate";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { Cull, MergeStatic, FogFarSync, LowEnvironment, AutoQuality, DprSync, PhysicsProbe } from "@/components/SceneTools";
+import { Cull, MergeStatic, FogFarSync, LowEnvironment, AutoQuality, DprSync, PhysicsProbe, SinglePassTransparent } from "@/components/SceneTools";
 import { asset } from "@/lib/asset";
 import { useHudStore } from "@/lib/hudStore";
 import { unlockAudio, setMuted } from "@/lib/audio";
@@ -338,6 +338,7 @@ export default function Game() {
       >
         <Suspense fallback={null}>
           <PerfProbe />
+          <SinglePassTransparent />
           <ReadyGate stages={BOOT_STAGES} />
           <AutoQuality />
           <DprSync />

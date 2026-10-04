@@ -20,6 +20,7 @@ import { checkCrashDebris } from "@/lib/debris";
 import { consumePedestrianHitSlowdown } from "@/lib/pedestrianHit";
 import { RIDE_HEIGHT } from "@/components/SupercarBody";
 import { CommercialBody, type CommercialKind } from "@/components/CommercialBody";
+import { MergeStatic } from "@/components/SceneTools";
 import { CommercialCockpit } from "@/components/CommercialCockpit";
 import { clampFromWater, groundYAt } from "@/lib/marina";
 import { QueryFilterFlags, type KinematicCharacterController } from "@dimforge/rapier3d-compat";
@@ -230,7 +231,10 @@ export function CommercialVehicle({ kind, color }: { kind: CommercialKind; color
         position={[0, bh / 2 - RIDE_HEIGHT, 0]}
         collisionGroups={VEHICLE_BODY_GROUPS}
       />
-      <CommercialBody kind={kind} color={color} lightRefs={lightRefs} />
+      {/* v1.7b perf: the parked bus/truck/jeep was ~40 separate procedural
+          meshes (unnamed, 40 draw calls in the Mizu 21 view on phone LOW) —
+          merged per material look like the NPC police cars */}
+      <MergeStatic name={`vehicle-${kind}`} byLook><CommercialBody kind={kind} color={color} lightRefs={lightRefs} /></MergeStatic>
       <CommercialCockpit kind={kind} eyeX={spec.cockpitForward} eyeY={spec.cockpitEyeHeight} />
     </RigidBody>
   );

@@ -45,8 +45,8 @@ const JOBS = [
   ["lada2103.glb", "cars/lada2103.glb", 45000, 1024, /^Torpedoplastic2103|^2103Divan|^steer_02a|^Radiola2103|^Lada2103_gauges|^Suspension|^coilfeal/i],
   // NPC traffic LODs of the same three (no wheel rig, merged static body)
   ["cobalt.glb", "traffic/cobalt.glb", 6000, 256, /^bancos|^painel|^steering_ok|^Gravel/i, { strip: true, steps: 12, errScale: 2 }],
-  ["captiva.glb", "traffic/captiva.glb", 6000, 256, /^interior|^plaquette|^visse/i, { strip: true, steps: 12, errScale: 2 }],
-  ["lada2103.glb", "traffic/lada2103.glb", 6000, 256, /^Torpedoplastic2103|^2103Divan|^steer_02a|^Radiola2103|^Lada2103_gauges|^Suspension|^coilfeal|^amdb11|^VAZPotolok/i, { strip: true, steps: 12, errScale: 2 }],
+  ["captiva.glb", "traffic/captiva.glb", 6000, 256, /^interior|^plaquette|^visse/i, { untextured: true, strip: true, steps: 12, errScale: 2 }],
+  ["lada2103.glb", "traffic/lada2103.glb", 6000, 256, /^Torpedoplastic2103|^2103Divan|^steer_02a|^Radiola2103|^Lada2103_gauges|^Suspension|^coilfeal|^amdb11|^VAZPotolok/i, { untextured: true, strip: true, steps: 12, errScale: 2 }],
   // v1.7b real Tashkent landmarks (Sketchfab; licences in CREDITS.md)
   ["landmarks/temur.glb", "landmarks/temur.glb", 14000, 1024],
   ["landmarks/oliy-majlis.glb", "landmarks/oliy-majlis.glb", 18000, 512, null, { strip: true, steps: 10 }],

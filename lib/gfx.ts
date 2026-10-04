@@ -115,7 +115,7 @@ export function profileFor(quality: Quality, dprScale = 1, safe = false): GfxPro
     fogScale: 0.42,
     pointLights: 2,
     trafficExtra: !mobile,
-    npcDrawDist: 170,
+    npcDrawDist: 140, // v1.7b: 170 → 140 (fogged out by then on LOW anyway)
   };
 }
 
