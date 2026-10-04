@@ -1,0 +1,13 @@
+[mobile-chromium-portrait] ready (loading screen gone) after 25.5 s
+[mobile-chromium-portrait] ui: {"touchClass":true,"tc":true,"controls":false,"camsel":false,"sens":false,"tdtools":false,"helpbtn":false,"gfxLabel":"LO","dpr":2} gfx stored: (default)
+[mobile-chromium-portrait] boxes: [{"s":"#hud","r":[10,8,119,33]},{"s":"#speedo","r":[157,774,233,830]},{"s":"#nitrobar","r":[157,744,233,764]},{"s":"#minimap","r":[288,50,380,142]},{"s":"#tc-top","r":[163,8,380,40]},{"s":".tc-steer","r":[10,770,138,830]},{"s":".tc-gas","r":[316,766,380,830]},{"s":".tc-brake","r":[252,774,308,830]},{"s":".tc-hb","r":[259,720,301,762]},{"s":".tc-nitro","r":[327,714,369,756]},{"s":"#waypoint","r":[10,42,111,66]}]
+[mobile-chromium-portrait] OVERLAPS: none (viewport 390x844)
+[mobile-chromium-portrait] render fps (headless software GL): 5.0
+[mobile-chromium-portrait] speed at rest: 0 pos 0.0 -0.0 heading 0.000
+[mobile-chromium-portrait] while multi-touch: {"gas":true,"steer":"tc-steer l"}
+[mobile-chromium-portrait] after slide to right of centre: tc-steer r
+[mobile-chromium-portrait] speed 1.5s after releasing: 51
+[mobile-chromium-portrait] after CAM tap msg: CAMERA: COCKPIT
+[mobile-chromium-portrait] after RESET tap msg: CAR RESET
+[mobile-chromium-portrait] RESULT maxSpeed=50 km/h, heading change while steering left=0.534 rad, page zoom=1
+[mobile-chromium-portrait] ERRORS(0):
