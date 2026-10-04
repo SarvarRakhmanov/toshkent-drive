@@ -9,7 +9,9 @@ import * as THREE from "three";
 import { skyState } from "@/lib/skyState";
 import { worldState } from "@/lib/worldState";
 import { loadSave } from "@/lib/saveGame";
-import { LANDMARKS } from "@/lib/landmarks";
+import { LANDMARKS, FUNCTIONAL_LANDMARKS } from "@/lib/landmarks";
+import { isBigCity } from "@/lib/mapChoice";
+import { BigCityBlock } from "@/components/BigCity";
 import { CLUB_IN } from "@/lib/club";
 import { HIGHWAY_CHUNKS } from "@/lib/highway";
 import { isReady } from "@/lib/loadState";
@@ -638,6 +640,13 @@ const LOBES = [
 
 // which chunk each landmark sits in, so buildChunk (well, Chunk) forces it clear —
 // same idea as the original's landmarkChunks map
+const BIG_CITY = isBigCity();
+// on the Big City map only the functional places (and the spawn block) stay clear
+const BIG_EXEMPT = new Set(LANDMARKS.filter((l) => FUNCTIONAL_LANDMARKS.has(l.name)).map((l) => `${Math.round(l.x / CELL)},${Math.round(l.z / CELL)}`));
+function isBigExempt(ci: number, cj: number) {
+  const k = `${ci},${cj}`;
+  return (ci === 0 && cj === 0) || BIG_EXEMPT.has(k) || k === CLUB_IN_CHUNK || AIRPORT_CHUNKS.has(k) || HIGHWAY_CHUNKS.has(k);
+}
 const LANDMARK_CHUNKS = new Set(LANDMARKS.map((l) => `${Math.round(l.x / CELL)},${Math.round(l.z / CELL)}`));
 // CLUB_IN sits far south, outside any real landmark chunk — exempt it too so
 // no random building/park spawns inside/around the club interior room
@@ -842,6 +851,10 @@ function StreetLamp({ x, z, rotY = 0 }: { x: number; z: number; rotY?: number })
 function Chunk({ ci, cj }: { ci: number; cj: number }) {
   const cx = ci * CELL;
   const cz = cj * CELL;
+  // v1.7.1 Big City map: same roads/lamps/street trees, but the block interior
+  // is a real city block (components/BigCity.tsx) instead of procedural
+  // buildings/parks. Only the functional places keep their blocks clear.
+  const bigBlock = BIG_CITY && !isBigExempt(ci, cj);
   // keep the spawn block and any landmark's block clear of random buildings/
   // parks, like the original's showroom/club/landmarkChunks exemptions
   const isExempt =
@@ -852,7 +865,7 @@ function Chunk({ ci, cj }: { ci: number; cj: number }) {
     HIGHWAY_CHUNKS.has(`${ci},${cj}`);
 
   const content = useMemo(() => {
-    if (isExempt)
+    if (BIG_CITY ? !bigBlock : isExempt)
       return {
         buildings: [] as BuildingSpec[],
         trees: [] as TreeDesc[],
@@ -860,7 +873,7 @@ function Chunk({ ci, cj }: { ci: number; cj: number }) {
         lamp: null as { x: number; z: number; rotY: number } | null,
       };
     const rand = mulberry32(((ci * 73856093) ^ (cj * 19349663) ^ 0x5bd1e995) >>> 0);
-    const isPark = rand() < 0.13; // matches the original's isPark chance exactly
+    const isPark = !BIG_CITY && rand() < 0.13; // matches the original's isPark chance exactly
     const margin = ROAD_W / 2 + 6;
     const half = CELL / 2 - margin; // 34 — half-width of the buildable block interior, road stays clear outside this
     const zone = zoneFor(ci, cj);
@@ -876,7 +889,7 @@ function Chunk({ ci, cj }: { ci: number; cj: number }) {
       buildings.push({ kind, x, z, w, d, h, matIdx, colorIdx, groupX: x, groupZ: z });
     };
 
-    if (!isPark) {
+    if (!isPark && !BIG_CITY) {
       if (zone === "residential") {
         const roll = rand();
         if (roll < 0.35) {
@@ -1002,6 +1015,7 @@ function Chunk({ ci, cj }: { ci: number; cj: number }) {
       {content.buildings.map((b, i) => (
         <Building key={i} spec={b} />
       ))}
+      {bigBlock && <BigCityBlock ci={ci} cj={cj} cell={CELL} />}
       <Trees specs={content.trees} />
       {content.lamp && <StreetLamp x={content.lamp.x} z={content.lamp.z} rotY={content.lamp.rotY} />}
     </group>

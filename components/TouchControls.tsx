@@ -16,6 +16,7 @@ import { useTouchStore } from "@/lib/touch";
 import { usePauseStore } from "@/lib/pauseStore";
 import { useHudStore, CAM_MODES } from "@/lib/hudStore";
 import { useGfxStore } from "@/lib/gfx";
+import { MapPicker } from "@/components/MapPicker";
 import {
   actionUse, actionSwitchVehicle, actionCamera, actionLights, actionMute, actionWeather,
   actionMap, actionPhone, actionGraphics, actionNextCar, actionResetCar,
@@ -248,6 +249,7 @@ function SettingsMenu({ onClose }: { onClose: () => void }) {
         />
         <span>{sens.toFixed(1)}x</span>
       </label>
+      <MapPicker compact />
       {item("CREDITS", () => useCreditsStore.getState().setOpen(true))}
       <div className="tc-tip">Drag on the road to look around</div>
     </div>

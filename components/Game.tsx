@@ -85,6 +85,7 @@ import { LIVERIES } from "@/components/Airliner";
 import { Props } from "@/components/Props";
 import { TashkentLandmarks } from "@/components/TashkentLandmarks";
 import { Skyline } from "@/components/Skyline";
+import { isBigCity } from "@/lib/mapChoice";
 import { Clouds } from "@/components/Clouds";
 import { Headlights } from "@/components/Headlights";
 import { MouseLook } from "@/components/MouseLook";
@@ -343,7 +344,7 @@ export default function Game() {
           <AutoQuality />
           <DprSync />
           <SkyCycle />
-          <Skyline />
+          {!isBigCity() && <Skyline />}
           <Clouds />
           <FogFarSync />
           <LightPool count={prof.pointLights} />
@@ -404,7 +405,7 @@ export default function Game() {
               <Props />
             </Deferred>
             <Deferred stage={3}>
-              <group name="Landmarks"><TashkentLandmarks /></group>
+              {!isBigCity() && <group name="Landmarks"><TashkentLandmarks /></group>}
               <group name="Highway"><Highway /></group>
               <Cull name="PoliceStation"><PoliceStation /></Cull>
               <Cull name="Mizu"><MergeStatic name="Mizu" byLook><MizuRestaurant /></MergeStatic></Cull>

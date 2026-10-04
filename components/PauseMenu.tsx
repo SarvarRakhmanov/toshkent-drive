@@ -13,6 +13,7 @@ import {
   actionWeather, actionMute, actionGraphics, actionResetCar,
 } from "@/lib/actions";
 import { PlateEditor } from "@/components/PlateEditor";
+import { MapPicker } from "@/components/MapPicker";
 
 // v1.7b: always-visible MENU / pause button on every device (desktop, phone
 // browser, APK). Opening it pauses the game (lib/pauseStore.ts) and offers
@@ -85,6 +86,7 @@ export function PauseMenu() {
               <button type="button" data-car="boat" style={active === "boat" ? sel : btn} onClick={run(() => actionSelectVehicle("boat"))}>BOAT</button>
             </div>
             <div style={{ margin: "10px 0 4px", color: "#9aa3b2", letterSpacing: 1.5, fontSize: 10 }}>SETTINGS</div>
+            <MapPicker />
             <PlateEditor />
             <button type="button" style={btn} onClick={run(actionCamera, true)}>CAMERA: {CAM_MODES[camMode]}</button>
             <button type="button" style={btn} onClick={run(actionGraphics, true)}>GRAPHICS: {quality === "high" ? "HIGH" : "LOW"}</button>

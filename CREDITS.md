@@ -129,3 +129,14 @@ All licences verified on the Sketchfab API on 2026-10-04; all **modified** (deci
 | nest-one.glb, nest-one-low.glb, nest-one-far.glb | 3D model uzbekistan tashkent sity Nest One | [qudratovalisher83](https://sketchfab.com/qudratovalisher83) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (89k → 9k / 3.8k / 2.3k tris) | https://sketchfab.com/3d-models/3d-model-uzbekistan-tashkent-sity-nest-one-7692a34317c74efdb1c28f921db12f54 |
 
 Not used: Hotel Uzbekistan (Sketchfab 4dcb8e0b…) — no licence and not downloadable; the skyline impostor stays.
+
+
+## Big City map (v1.7.1)
+Licences checked on the Sketchfab API on 2026-10-04; the user explicitly approved using the three **Sketchfab Free Standard** models below (Sketchfab Standard licence: free to use in a project, credit given, not redistributed as standalone assets). All **modified**: sliced into 68 m city blocks, flat ground/road sheets removed, rescaled, merged per material, simplified with meshoptimizer (borders locked), textures 256 px WebP, meshopt compression, plus a baked box impostor per block (1024 px WebP atlas, 1 draw call). Built by `scripts/build-bigcity.mjs` + `scripts/bigcity-bake/`. Files under `public/models/bigcity/` (block-scene-*, block-citya-*, block-hkiv-*, block-hk-*).
+
+| Files | Model | Author | License | Source |
+|---|---|---|---|---|
+| block-citya-0…3 (+ -imp) | Full Gameready City Buildings [retextured] | [golukumar (mortalityrexotable)](https://sketchfab.com/mortalityrexotable) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (763k tris source) | https://sketchfab.com/3d-models/full-gameready-city-buildings-retextured-5fad2351e34f4c069a2eec45cce0824c |
+| block-hkiv-0…3 (+ -imp) | Full Gameready City Buildings IV [HongKong] | [abhayexe](https://sketchfab.com/abhayexe) | Sketchfab Free Standard (369k tris source) | https://sketchfab.com/3d-models/full-gameready-city-buildings-iv-hongkong-31c1ede1fcbd49c7af85825905446ec5 |
+| block-hk-0…7 (+ -imp) | Full Gameready City Buildings [HongKong] | [Katydid (Katydid.)](https://sketchfab.com/Katydid.) | Sketchfab Free Standard (52k tris source) | https://sketchfab.com/3d-models/full-gameready-city-buildings-hongkong-1c67779cde264f0e986fbae9b76cc421 |
+| block-scene-0…1 (+ -imp) | City Scene | [golukumar (mortalityrexotable)](https://sketchfab.com/mortalityrexotable) | Sketchfab Free Standard (1.29M tris source) | https://sketchfab.com/3d-models/city-scene-c00b3b8c71594890a2a3c46c20a30b5c |

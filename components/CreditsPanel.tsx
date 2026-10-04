@@ -38,6 +38,12 @@ export function CreditsPanel() {
         <b>NBU Uzbekistan Tashkent</b> by UZBEK 3D, <b>Nest One</b> by qudratovalisher83 (CC BY 4.0).
       </p>
       <p>
+        Big City map (Sketchfab, modified: sliced into blocks, decimated, impostors baked):{" "}
+        <b>Full Gameready City Buildings [retextured]</b> by golukumar (CC BY 4.0),{" "}
+        <b>Full Gameready City Buildings IV [HongKong]</b> by abhayexe,{" "}
+        <b>Full Gameready City Buildings [HongKong]</b> by Katydid and <b>City Scene</b> by golukumar (Sketchfab Free Standard).
+      </p>
+      <p>
         Cockpit interiors: <b>Autonomous GT Car Interior Design</b> by benlockett and{" "}
         <b>Car interior</b> by Gerhald (Sketchfab, CC BY 4.0, modified).
       </p>

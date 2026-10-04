@@ -1,0 +1,90 @@
+<html><body style="margin:0;background:#888"><script type="importmap">{"imports":{"three":"./three/build/three.module.js","three/addons/":"./three/examples/jsm/"}}</script>
+<script type="module">
+// Big City impostor baker: for each block's building boxes (blocks.json `imp`)
+// render 4 sides + roof orthographically (albedo only) into one atlas and
+// build a box mesh textured from it -> block-<name>-imp.glb (1 material, 1 draw call)
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+const A = 1024;
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
+r.setPixelRatio(1); r.setSize(A, A); r.setClearColor(0x000000, 0); document.body.appendChild(r.domElement);
+r.outputColorSpace = THREE.SRGBColorSpace;
+const L = new GLTFLoader(); L.setMeshoptDecoder(MeshoptDecoder);
+window.bake = async (name, boxes) => {
+  const g = await L.loadAsync(`./models/bigcity/${name}.glb`);
+  const scene = new THREE.Scene();
+  g.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const m = o.material;
+    o.material = new THREE.MeshBasicMaterial({ map: m.map || null, color: m.color, vertexColors: !!o.geometry.attributes.color, side: THREE.DoubleSide, transparent: m.transparent, opacity: m.opacity, alphaTest: m.alphaTest });
+  });
+  scene.add(g.scene);
+  // faces: [dir, w, h] per box; texel density chosen so everything fits
+  const faces = [];
+  for (const b of boxes) {
+    const [x0, y0, z0, x1, y1, z1, mask = 31] = b; const w = x1 - x0, h = y1 - y0, d = z1 - z0;
+    const all = [{ b, f: "+x", w: d, h }, { b, f: "-x", w: d, h }, { b, f: "+z", w, h }, { b, f: "-z", w, h }, { b, f: "+y", w, h: d }];
+    all.forEach((f, k) => { if (mask & (1 << k)) faces.push(f); });
+  }
+  const area = faces.reduce((s, f) => s + f.w * f.h, 0);
+  let D = Math.min(14, Math.sqrt((A * A * 0.62) / area));
+  let packed;
+  for (let tries = 0; tries < 12; tries++) {
+    // shelf pack, tallest first
+    const order = [...faces].sort((a, b) => b.h - a.h);
+    let x = 0, y = 0, sh = 0, ok = true;
+    for (const f of order) {
+      f.pw = Math.max(2, Math.ceil(f.w * D) + 2); f.ph = Math.max(2, Math.ceil(f.h * D) + 2);
+      if (f.pw > A) { ok = false; break; }
+      if (x + f.pw > A) { x = 0; y += sh; sh = 0; }
+      if (y + f.ph > A) { ok = false; break; }
+      f.px = x; f.py = y; x += f.pw; sh = Math.max(sh, f.ph);
+    }
+    if (ok) { packed = true; break; }
+    D *= 0.9;
+  }
+  if (!packed) throw new Error("pack failed " + name);
+  r.setScissorTest(true); r.setClearColor(0x000000, 0); r.setViewport(0, 0, A, A); r.setScissor(0, 0, A, A); r.clear();
+  const pos = [], uv = [], nrm = [], idx = [];
+  const M = 0.4;
+  for (const f of faces) {
+    const [x0, y0, z0, x1, y1, z1] = f.b; const c = new THREE.Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    const cam = new THREE.OrthographicCamera(-f.w / 2, f.w / 2, f.h / 2, -f.h / 2, 0.01, 1000);
+    let n, depth;
+    if (f.f === "+x") { n = new THREE.Vector3(1, 0, 0); depth = x1 - x0; }
+    if (f.f === "-x") { n = new THREE.Vector3(-1, 0, 0); depth = x1 - x0; }
+    if (f.f === "+z") { n = new THREE.Vector3(0, 0, 1); depth = z1 - z0; }
+    if (f.f === "-z") { n = new THREE.Vector3(0, 0, -1); depth = z1 - z0; }
+    if (f.f === "+y") { n = new THREE.Vector3(0, 1, 0); depth = y1 - y0; cam.up.set(0, 0, -1); }
+    const half = depth / 2;
+    cam.position.copy(c).addScaledVector(n, half + M); cam.lookAt(c); cam.near = 0.01; cam.far = depth + 2 * M; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+    const ix = f.px + 1, iy = f.py + 1, iw = f.pw - 2, ih = f.ph - 2;
+    r.setViewport(ix, A - iy - ih, iw, ih); r.setScissor(ix, A - iy - ih, iw, ih);
+    r.render(scene, cam);
+    // quad on the box face, uv from camera right/up
+    const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0), up = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
+    const fc = c.clone().addScaledVector(n, half);
+    const base = pos.length / 3;
+    for (const [su, sv] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      const p = fc.clone().addScaledVector(right, (su * f.w) / 2).addScaledVector(up, (sv * f.h) / 2);
+      pos.push(p.x, p.y, p.z); nrm.push(n.x, n.y, n.z);
+      const u = (ix + ((su + 1) / 2) * iw) / A, vpx = iy + (1 - (sv + 1) / 2) * ih; // canvas px (top-left)
+      uv.push(u, 1 - vpx / A);
+    }
+    idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+  r.setScissorTest(false);
+  const cv = document.createElement("canvas"); cv.width = A; cv.height = A; cv.getContext("2d").drawImage(r.domElement, 0, 0);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("normal", new THREE.Float32BufferAttribute(nrm, 3)); geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, roughness: 0.9, metalness: 0 }));
+  mesh.name = name + "-imp";
+  const out = await new GLTFExporter().parseAsync(mesh, { binary: true });
+  const bytes = new Uint8Array(out); let s = ""; for (let i = 0; i < bytes.length; i += 32768) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+  return { glb: btoa(s), D: +D.toFixed(2), faces: faces.length, atlas: cv.toDataURL("image/png") };
+};
+document.title = "ready";
+</script></body></html>

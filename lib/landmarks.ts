@@ -1,3 +1,4 @@
+import { isBigCity } from "@/lib/mapChoice";
 // Exact positions/colors from the original's LANDMARKS array. The original
 // builds a distinct structure per landmark (park, stadium, tower, plaza,
 // club, marina, police station); this build marks each spot with a beacon +
@@ -47,3 +48,23 @@ export const LANDMARKS: Landmark[] = [
   // other landmark, reachable only by crossing the bridge (or by boat/air)
   { name: "FORT NEON", x: 1670, z: -400, col: "#8a9a4a" },
 ].map((l) => ({ col: "#ff3fd6", ...l })) as Landmark[];
+
+// v1.7.1 Big City map (lib/mapChoice.ts): the Tashkent-only landmarks (real
+// models in components/TashkentLandmarks.tsx) aren't built there — their
+// blocks get Big City buildings and their minimap/GPS labels get generic
+// names. The functional places (club, garage market, marina, police, Mizu,
+// airport, Fort Neon) exist on both maps and keep their names + clear blocks.
+export const FUNCTIONAL_LANDMARKS = new Set(["VENU", "AVTO BOZOR", "CHORVOQ MARINA", "IIB POST", "MIZU 21", "TOSHKENT AEROPORTI", "FORT NEON"]);
+const BIG_CITY_NAMES: Record<string, string> = {
+  "AMIR TEMUR XIYOBONI": "CENTRAL SQUARE",
+  "BUNYODKOR STADIONI": "WEST GATE",
+  "TOSHKENT MINORASI": "SKYLINE AVENUE",
+  "MUSTAQILLIK MAYDONI": "LIBERTY SQUARE",
+  "ANHOR KO'LI": "CANAL STREET",
+  "TASHKENT CITY": "DOWNTOWN",
+  "CHILONZOR": "KOWLOON BLOCKS",
+  "TOSHKENT SIRKI": "HARBOUR ROAD",
+  "MILLIY BANK (NBU)": "FINANCIAL DISTRICT",
+  "NEST ONE": "TOWER ROW",
+};
+if (isBigCity()) for (const l of LANDMARKS) if (BIG_CITY_NAMES[l.name]) l.name = BIG_CITY_NAMES[l.name];
